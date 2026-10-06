@@ -37,7 +37,9 @@ jobs:
       - name: Aceptar licencias Android
         shell: bash
         run: |
+          set +o pipefail
           yes | sdkmanager --licenses > /dev/null
+          set -o pipefail
 
       - name: Instalar Android SDK 37
         shell: bash
@@ -50,15 +52,15 @@ jobs:
       - name: Verificar Android SDK instalado
         shell: bash
         run: |
-          echo "Plataformas instaladas:"
-          sdkmanager --list_installed | grep -E "platforms;android-37|build-tools;37" || true
+          echo "=== SDK instalado ==="
+          sdkmanager --list_installed | grep -E "platforms;android-37|build-tools;37|platform-tools" || true
 
           echo ""
-          echo "Contenido de platforms:"
+          echo "=== Plataformas ==="
           ls -la "$ANDROID_SDK_ROOT/platforms"
 
           echo ""
-          echo "Contenido de build-tools:"
+          echo "=== Build Tools ==="
           ls -la "$ANDROID_SDK_ROOT/build-tools"
 
       - name: Conceder permisos al Gradle Wrapper
@@ -70,7 +72,7 @@ jobs:
       - name: Comprobar APK generado
         shell: bash
         run: |
-          echo "APKs generados:"
+          echo "=== APKs generados ==="
           find app/build/outputs/apk -type f -name "*.apk" -print
 
       - name: Subir APK
