@@ -4,14 +4,9 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -56,13 +51,11 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -83,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -291,7 +285,7 @@ private fun TaskendaScreen() {
         mutableIntStateOf(0)
     }
 
-    var showAddSheet by remember {
+    var showEditor by remember {
         mutableStateOf(false)
     }
 
@@ -341,14 +335,13 @@ private fun TaskendaScreen() {
         bottomBar = {
 
             TaskendaBottomBar(
-
                 selectedTab =
                     selectedTab,
-
-                onTabSelected = { tab ->
+                onTabSelected = {
+                    tab ->
 
                     if (
-                        selectedTab != tab
+                        tab != selectedTab
                     ) {
 
                         haptic.performHapticFeedback(
@@ -361,9 +354,6 @@ private fun TaskendaScreen() {
             )
         },
 
-        floatingActionButtonPosition =
-            FabPosition.Center,
-
         floatingActionButton = {
 
             FloatingActionButton(
@@ -375,21 +365,24 @@ private fun TaskendaScreen() {
                     )
 
                     editingTask = null
-
-                    showAddSheet = true
+                    showEditor = true
                 },
 
                 modifier =
-                    Modifier.size(58.dp),
+                    Modifier.size(56.dp),
 
                 shape =
-                    RoundedCornerShape(19.dp),
+                    RoundedCornerShape(18.dp),
 
                 containerColor =
-                    MaterialTheme.colorScheme.primaryContainer,
+                    MaterialTheme
+                        .colorScheme
+                        .primaryContainer,
 
                 contentColor =
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    MaterialTheme
+                        .colorScheme
+                        .onPrimaryContainer
 
             ) {
 
@@ -401,7 +394,7 @@ private fun TaskendaScreen() {
                         "Añadir tarea",
 
                     modifier =
-                        Modifier.size(28.dp)
+                        Modifier.size(27.dp)
                 )
             }
         }
@@ -423,10 +416,8 @@ private fun TaskendaScreen() {
         ) {
 
             TaskendaHeader(
-
                 selectedTab =
                     selectedTab,
-
                 taskCount =
                     visibleTasks.size
             )
@@ -454,7 +445,7 @@ private fun TaskendaScreen() {
 
                     contentPadding =
                         PaddingValues(
-                            bottom = 90.dp
+                            bottom = 76.dp
                         ),
 
                     verticalArrangement =
@@ -539,7 +530,7 @@ private fun TaskendaScreen() {
                                 editingTask =
                                     task
 
-                                showAddSheet =
+                                showEditor =
                                     true
                             },
 
@@ -556,7 +547,7 @@ private fun TaskendaScreen() {
     }
 
     if (
-        showAddSheet
+        showEditor
     ) {
 
         TaskEditorSheet(
@@ -566,7 +557,7 @@ private fun TaskendaScreen() {
 
             onDismiss = {
 
-                showAddSheet =
+                showEditor =
                     false
 
                 editingTask =
@@ -629,7 +620,7 @@ private fun TaskendaScreen() {
                     HapticFeedbackType.Confirm
                 )
 
-                showAddSheet =
+                showEditor =
                     false
 
                 editingTask =
@@ -731,22 +722,24 @@ private fun TaskendaBottomBar(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(
-                    start = 18.dp,
-                    end = 18.dp,
-                    bottom = 8.dp
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = 7.dp
                 ),
 
         shape =
-            RoundedCornerShape(28.dp),
+            RoundedCornerShape(26.dp),
 
         color =
-            MaterialTheme.colorScheme.surfaceContainerHigh,
+            MaterialTheme
+                .colorScheme
+                .surfaceContainerHigh,
 
         tonalElevation =
-            5.dp,
+            4.dp,
 
         shadowElevation =
-            6.dp
+            5.dp
 
     ) {
 
@@ -755,7 +748,7 @@ private fun TaskendaBottomBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(68.dp)
+                    .height(62.dp)
                     .padding(
                         horizontal = 5.dp
                     ),
@@ -764,40 +757,46 @@ private fun TaskendaBottomBar(
                 Alignment.CenterVertically,
 
             horizontalArrangement =
-                Arrangement.SpaceEvenly
+                Arrangement.Center
 
         ) {
 
             TaskNavItem(
-
                 selected =
                     selectedTab == 0,
-
                 icon =
                     Icons.Rounded.Home,
-
                 label =
                     "Inicio",
-
+                width =
+                    if (
+                        selectedTab == 0
+                    ) {
+                        104.dp
+                    } else {
+                        48.dp
+                    },
                 onClick = {
-
                     onTabSelected(0)
                 }
             )
 
             TaskNavItem(
-
                 selected =
                     selectedTab == 1,
-
                 icon =
                     Icons.Rounded.Upcoming,
-
                 label =
                     "Pendientes",
-
+                width =
+                    if (
+                        selectedTab == 1
+                    ) {
+                        108.dp
+                    } else {
+                        48.dp
+                    },
                 onClick = {
-
                     onTabSelected(1)
                 }
             )
@@ -808,35 +807,41 @@ private fun TaskendaBottomBar(
             )
 
             TaskNavItem(
-
                 selected =
                     selectedTab == 2,
-
                 icon =
                     Icons.Rounded.Star,
-
                 label =
                     "Importantes",
-
+                width =
+                    if (
+                        selectedTab == 2
+                    ) {
+                        108.dp
+                    } else {
+                        48.dp
+                    },
                 onClick = {
-
                     onTabSelected(2)
                 }
             )
 
             TaskNavItem(
-
                 selected =
                     selectedTab == 3,
-
                 icon =
                     Icons.Rounded.Check,
-
                 label =
                     "Hechas",
-
+                width =
+                    if (
+                        selectedTab == 3
+                    ) {
+                        94.dp
+                    } else {
+                        48.dp
+                    },
                 onClick = {
-
                     onTabSelected(3)
                 }
             )
@@ -849,10 +854,11 @@ private fun TaskNavItem(
 
     selected: Boolean,
 
-    icon:
-        androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
 
     label: String,
+
+    width: androidx.compose.ui.unit.Dp,
 
     onClick: () -> Unit
 
@@ -876,11 +882,11 @@ private fun TaskNavItem(
             animationSpec =
                 spring(
                     stiffness =
-                        Spring.StiffnessMediumLow
+                        Spring.StiffnessMedium
                 ),
 
             label =
-                "navigationBackground"
+                "navColor"
         )
 
     val contentColor =
@@ -901,16 +907,15 @@ private fun TaskNavItem(
 
         modifier =
             Modifier
-                .height(54.dp)
+                .width(width)
+                .height(50.dp)
                 .clickable(
                     onClick =
                         onClick
                 ),
 
         shape =
-            RoundedCornerShape(
-                21.dp
-            ),
+            RoundedCornerShape(20.dp),
 
         color =
             background
@@ -920,15 +925,7 @@ private fun TaskNavItem(
         Row(
 
             modifier =
-                Modifier
-                    .padding(
-                        horizontal =
-                            if (selected) {
-                                10.dp
-                            } else {
-                                13.dp
-                            }
-                    ),
+                Modifier.fillMaxSize(),
 
             verticalAlignment =
                 Alignment.CenterVertically,
@@ -947,56 +944,38 @@ private fun TaskNavItem(
                     label,
 
                 modifier =
-                    Modifier.size(
-                        23.dp
-                    ),
+                    Modifier.size(22.dp),
 
                 tint =
                     contentColor
             )
 
-            AnimatedVisibility(
+            if (selected) {
 
-                visible =
-                    selected,
+                Spacer(
+                    modifier =
+                        Modifier.width(5.dp)
+                )
 
-                enter =
-                    fadeIn() +
-                        scaleIn(),
+                Text(
 
-                exit =
-                    fadeOut() +
-                        scaleOut()
+                    text =
+                        label,
 
-            ) {
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelMedium,
 
-                Row {
+                    fontWeight =
+                        FontWeight.SemiBold,
 
-                    Spacer(
-                        modifier =
-                            Modifier.width(5.dp)
-                    )
+                    color =
+                        contentColor,
 
-                    Text(
-
-                        text =
-                            label,
-
-                        style =
-                            MaterialTheme
-                                .typography
-                                .labelMedium,
-
-                        fontWeight =
-                            FontWeight.SemiBold,
-
-                        color =
-                            contentColor,
-
-                        maxLines =
-                            1
-                    )
-                }
+                    maxLines =
+                        1
+                )
             }
         }
     }
@@ -1182,7 +1161,7 @@ private fun EmptyTasks(
             Surface(
 
                 modifier =
-                    Modifier.size(84.dp),
+                    Modifier.size(82.dp),
 
                 shape =
                     CircleShape,
@@ -1218,7 +1197,7 @@ private fun EmptyTasks(
                             null,
 
                         modifier =
-                            Modifier.size(38.dp),
+                            Modifier.size(37.dp),
 
                         tint =
                             MaterialTheme
@@ -1230,7 +1209,7 @@ private fun EmptyTasks(
 
             Spacer(
                 modifier =
-                    Modifier.height(18.dp)
+                    Modifier.height(16.dp)
             )
 
             Text(
@@ -1248,7 +1227,7 @@ private fun EmptyTasks(
 
             Spacer(
                 modifier =
-                    Modifier.height(6.dp)
+                    Modifier.height(5.dp)
             )
 
             Text(
@@ -1308,7 +1287,7 @@ private fun TaskRow(
                 ),
 
             label =
-                "taskContainer"
+                "taskColor"
         )
 
     var menuVisible by
@@ -1327,7 +1306,9 @@ private fun TaskRow(
                 ),
 
         shape =
-            RoundedCornerShape(22.dp),
+            RoundedCornerShape(
+                21.dp
+            ),
 
         colors =
             CardDefaults.cardColors(
@@ -1350,9 +1331,9 @@ private fun TaskRow(
                     .fillMaxWidth()
                     .padding(
                         start = 8.dp,
-                        end = 6.dp,
-                        top = 9.dp,
-                        bottom = 9.dp
+                        end = 5.dp,
+                        top = 8.dp,
+                        bottom = 8.dp
                     ),
 
             verticalAlignment =
@@ -1393,7 +1374,9 @@ private fun TaskRow(
                         FontWeight.Medium,
 
                     textDecoration =
-                        if (task.completed) {
+                        if (
+                            task.completed
+                        ) {
 
                             TextDecoration
                                 .LineThrough
@@ -1405,7 +1388,9 @@ private fun TaskRow(
                         },
 
                     color =
-                        if (task.completed) {
+                        if (
+                            task.completed
+                        ) {
 
                             MaterialTheme
                                 .colorScheme
@@ -1425,7 +1410,9 @@ private fun TaskRow(
 
                     Spacer(
                         modifier =
-                            Modifier.height(3.dp)
+                            Modifier.height(
+                                2.dp
+                            )
                     )
 
                     Text(
@@ -1454,14 +1441,14 @@ private fun TaskRow(
 
                     Spacer(
                         modifier =
-                            Modifier.height(5.dp)
+                            Modifier.height(
+                                4.dp
+                            )
                     )
 
                     Row(
-
                         verticalAlignment =
                             Alignment.CenterVertically
-
                     ) {
 
                         Icon(
@@ -1473,7 +1460,7 @@ private fun TaskRow(
 
                             modifier =
                                 Modifier.size(
-                                    15.dp
+                                    14.dp
                                 ),
 
                             tint =
@@ -1484,7 +1471,9 @@ private fun TaskRow(
 
                         Spacer(
                             modifier =
-                                Modifier.width(4.dp)
+                                Modifier.width(
+                                    4.dp
+                                )
                         )
 
                         Text(
@@ -1668,28 +1657,14 @@ private fun TaskCheckbox(
                 ),
 
             label =
-                "checkboxBackground"
+                "checkboxColor"
         )
-
-    val borderColor =
-        if (checked) {
-
-            MaterialTheme
-                .colorScheme
-                .primary
-
-        } else {
-
-            MaterialTheme
-                .colorScheme
-                .outline
-        }
 
     Surface(
 
         modifier =
             Modifier
-                .size(44.dp)
+                .size(43.dp)
                 .clickable(
                     onClick =
                         onClick
@@ -1702,18 +1677,19 @@ private fun TaskCheckbox(
             background,
 
         border =
-            BorderStroke(
+            if (checked) {
 
-                width =
-                    if (checked) {
-                        0.dp
-                    } else {
-                        2.dp
-                    },
+                null
 
-                color =
-                    borderColor
-            )
+            } else {
+
+                BorderStroke(
+                    2.dp,
+                    MaterialTheme
+                        .colorScheme
+                        .outline
+                )
+            }
 
     ) {
 
@@ -1722,20 +1698,7 @@ private fun TaskCheckbox(
                 Alignment.Center
         ) {
 
-            AnimatedVisibility(
-
-                visible =
-                    checked,
-
-                enter =
-                    fadeIn() +
-                        scaleIn(),
-
-                exit =
-                    fadeOut() +
-                        scaleOut()
-
-            ) {
+            if (checked) {
 
                 Icon(
 
@@ -1845,7 +1808,7 @@ private fun TaskEditorSheet(
                 Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(
-                        0.92f
+                        0.90f
                     )
                     .imePadding()
                     .padding(
@@ -1862,7 +1825,7 @@ private fun TaskEditorSheet(
                     Modifier
                         .fillMaxWidth()
                         .padding(
-                            bottom = 12.dp
+                            bottom = 10.dp
                         ),
 
                 contentAlignment =
@@ -1948,7 +1911,8 @@ private fun TaskEditorSheet(
                     modifier =
                         Modifier.fillMaxWidth(),
 
-                    singleLine = true,
+                    singleLine =
+                        true,
 
                     label = {
                         Text(
@@ -2017,49 +1981,16 @@ private fun TaskEditorSheet(
                         )
                 )
 
-                OutlinedTextField(
+                TaskDateField(
 
-                    value =
+                    date =
                         dueDate,
 
-                    onValueChange = {},
+                    onClick = {
 
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-
-                                showDatePicker =
-                                    true
-                            },
-
-                    readOnly =
-                        true,
-
-                    singleLine =
-                        true,
-
-                    label = {
-                        Text(
-                            "Fecha"
-                        )
-                    },
-
-                    leadingIcon = {
-
-                        Icon(
-
-                            Icons.Rounded.Today,
-
-                            contentDescription =
-                                null
-                        )
-                    },
-
-                    shape =
-                        RoundedCornerShape(
-                            18.dp
-                        )
+                        showDatePicker =
+                            true
+                    }
                 )
 
                 Spacer(
@@ -2171,7 +2102,7 @@ private fun TaskEditorSheet(
                 Spacer(
                     modifier =
                         Modifier.height(
-                            12.dp
+                            16.dp
                         )
                 )
             }
@@ -2195,7 +2126,7 @@ private fun TaskEditorSheet(
 
                             important,
 
-                            dueDate.trim()
+                            dueDate
                         )
                     }
                 },
@@ -2261,7 +2192,9 @@ private fun TaskEditorSheet(
                     false
             },
 
-            onDateSelected = { date ->
+            onDateSelected = {
+
+                date ->
 
                 dueDate =
                     date
@@ -2270,6 +2203,122 @@ private fun TaskEditorSheet(
                     false
             }
         )
+    }
+}
+
+@Composable
+private fun TaskDateField(
+
+    date: String,
+
+    onClick: () -> Unit
+
+) {
+
+    Surface(
+
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clickable(
+                    onClick =
+                        onClick
+                ),
+
+        shape =
+            RoundedCornerShape(
+                18.dp
+            ),
+
+        color =
+            Color.Transparent,
+
+        border =
+            BorderStroke(
+                1.dp,
+                MaterialTheme
+                    .colorScheme
+                    .outline
+            )
+
+    ) {
+
+        Row(
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal =
+                            14.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+
+        ) {
+
+            Icon(
+
+                Icons.Rounded.Today,
+
+                contentDescription =
+                    "Seleccionar fecha",
+
+                modifier =
+                    Modifier.size(
+                        20.dp
+                    ),
+
+                tint =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.width(
+                        12.dp
+                    )
+            )
+
+            Column {
+
+                Text(
+
+                    text =
+                        "Fecha",
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelSmall,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
+                )
+
+                Text(
+
+                    text =
+                        date,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurface
+                )
+            }
+        }
     }
 }
 
@@ -2344,8 +2393,10 @@ private fun TaskDatePickerDialog(
         dismissButton = {
 
             TextButton(
+
                 onClick =
                     onDismiss
+
             ) {
 
                 Text(
@@ -2395,12 +2446,49 @@ private fun parseDateMillis(
         format.isLenient =
             false
 
-        format.parse(
-            value
-        )?.time
-            ?: Calendar
+        val parsed =
+            format.parse(
+                value
+            )
+
+        if (
+            parsed != null
+        ) {
+
+            val calendar =
+                Calendar.getInstance()
+
+            calendar.time =
+                parsed
+
+            calendar.set(
+                Calendar.HOUR_OF_DAY,
+                12
+            )
+
+            calendar.set(
+                Calendar.MINUTE,
+                0
+            )
+
+            calendar.set(
+                Calendar.SECOND,
+                0
+            )
+
+            calendar.set(
+                Calendar.MILLISECOND,
+                0
+            )
+
+            calendar.timeInMillis
+
+        } else {
+
+            Calendar
                 .getInstance()
                 .timeInMillis
+        }
 
     } catch (_: Exception) {
 
@@ -2414,6 +2502,12 @@ private fun formatDate(
     millis: Long
 ): String {
 
+    val calendar =
+        Calendar.getInstance()
+
+    calendar.timeInMillis =
+        millis
+
     return SimpleDateFormat(
 
         "dd/MM/yyyy",
@@ -2421,6 +2515,6 @@ private fun formatDate(
         Locale.getDefault()
 
     ).format(
-        Date(millis)
+        calendar.time
     )
 }
