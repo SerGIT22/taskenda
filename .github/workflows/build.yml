@@ -29,8 +29,10 @@ jobs:
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Instalar Android SDK
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-37 build-tools;37.0.0'
 
       - name: Conceder permisos al Gradle Wrapper
         run: chmod +x ./gradlew
@@ -38,7 +40,7 @@ jobs:
       - name: Compilar APK Debug
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Comprobar APK
+      - name: Comprobar APK generado
         run: |
           echo "APKs generados:"
           find app/build/outputs/apk -type f -name "*.apk" -print
