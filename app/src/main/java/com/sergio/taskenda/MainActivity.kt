@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,14 +22,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.verticalScroll
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -90,16 +90,14 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
-
 private data class Task(
     val id: String = UUID.randomUUID().toString(),
-    var title: String,
-    var notes: String = "",
-    var completed: Boolean = false,
-    var important: Boolean = false,
-    var dueDate: String = ""
+    val title: String,
+    val notes: String = "",
+    val completed: Boolean = false,
+    val important: Boolean = false,
+    val dueDate: String = ""
 )
-
 
 private object TaskStorage {
 
@@ -107,100 +105,57 @@ private object TaskStorage {
     private const val TASKS = "tasks"
 
     fun load(context: Context): List<Task> {
-
         return try {
+            val prefs = context.getSharedPreferences(
+                PREFS,
+                Context.MODE_PRIVATE
+            )
 
-            val prefs =
-                context.getSharedPreferences(
-                    PREFS,
-                    Context.MODE_PRIVATE
-                )
-
-            val raw =
-                prefs.getString(
-                    TASKS,
-                    "[]"
-                ) ?: "[]"
+            val raw = prefs.getString(
+                TASKS,
+                "[]"
+            ) ?: "[]"
 
             val array = JSONArray(raw)
 
             buildList {
-
                 for (i in 0 until array.length()) {
-
-                    val item =
-                        array.getJSONObject(i)
+                    val item = array.getJSONObject(i)
 
                     add(
                         Task(
-                            id = item.optString("id"),
+                            id = item.optString("id").ifBlank {
+                                UUID.randomUUID().toString()
+                            },
                             title = item.optString("title"),
                             notes = item.optString("notes"),
-                            completed =
-                                item.optBoolean(
-                                    "completed"
-                                ),
-                            important =
-                                item.optBoolean(
-                                    "important"
-                                ),
-                            dueDate =
-                                item.optString(
-                                    "dueDate"
-                                )
+                            completed = item.optBoolean("completed"),
+                            important = item.optBoolean("important"),
+                            dueDate = item.optString("dueDate")
                         )
                     )
                 }
             }
-
         } catch (_: Exception) {
-
             emptyList()
         }
     }
-
 
     fun save(
         context: Context,
         tasks: List<Task>
     ) {
-
         val array = JSONArray()
 
         tasks.forEach { task ->
-
             array.put(
                 JSONObject().apply {
-
-                    put(
-                        "id",
-                        task.id
-                    )
-
-                    put(
-                        "title",
-                        task.title
-                    )
-
-                    put(
-                        "notes",
-                        task.notes
-                    )
-
-                    put(
-                        "completed",
-                        task.completed
-                    )
-
-                    put(
-                        "important",
-                        task.important
-                    )
-
-                    put(
-                        "dueDate",
-                        task.dueDate
-                    )
+                    put("id", task.id)
+                    put("title", task.title)
+                    put("notes", task.notes)
+                    put("completed", task.completed)
+                    put("important", task.important)
+                    put("dueDate", task.dueDate)
                 }
             )
         }
@@ -219,13 +174,11 @@ private object TaskStorage {
     }
 }
 
-
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
-
         super.onCreate(savedInstanceState)
 
         setContent {
@@ -234,143 +187,94 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 private fun TaskendaApp() {
 
-    val context =
-        LocalContext.current
-
-    val darkTheme =
-        isSystemInDarkTheme()
+    val context = LocalContext.current
+    val darkTheme = isSystemInDarkTheme()
 
     val colors =
-        if (
-            android.os.Build.VERSION.SDK_INT >= 31
-        ) {
-
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
             if (darkTheme) {
-
-                dynamicDarkColorScheme(
-                    context
-                )
-
+                dynamicDarkColorScheme(context)
             } else {
-
-                dynamicLightColorScheme(
-                    context
-                )
+                dynamicLightColorScheme(context)
             }
-
         } else {
-
             MaterialTheme.colorScheme
         }
 
     MaterialTheme(
         colorScheme = colors
     ) {
-
         TaskendaScreen()
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskendaScreen() {
 
-    val context =
-        LocalContext.current
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
-    val haptic =
-        LocalHapticFeedback.current
-
-    val tasks =
-        remember {
-
-            mutableStateListOf<Task>().apply {
-
-                addAll(
-                    TaskStorage.load(
-                        context
-                    )
-                )
-            }
+    val tasks = remember {
+        mutableStateListOf<Task>().apply {
+            addAll(
+                TaskStorage.load(context)
+            )
         }
-
+    }
 
     var selectedTab by remember {
-
         mutableIntStateOf(0)
     }
 
-
     var showEditor by remember {
-
         mutableStateOf(false)
     }
 
-
     var editingTask by remember {
-
         mutableStateOf<Task?>(null)
     }
-
 
     var taskToDelete by remember {
-
         mutableStateOf<Task?>(null)
     }
 
-
     fun persist() {
-
         TaskStorage.save(
             context,
             tasks.toList()
         )
     }
 
-
     val visibleTasks =
         when (selectedTab) {
+            1 -> tasks.filter {
+                !it.completed
+            }
 
-            1 ->
-                tasks.filter {
-                    !it.completed
-                }
+            2 -> tasks.filter {
+                it.important && !it.completed
+            }
 
-            2 ->
-                tasks.filter {
-                    it.important &&
-                        !it.completed
-                }
+            3 -> tasks.filter {
+                it.completed
+            }
 
-            3 ->
-                tasks.filter {
-                    it.completed
-                }
-
-            else ->
-                tasks.filter {
-                    !it.completed
-                }
+            else -> tasks.filter {
+                !it.completed
+            }
         }
-
 
     Scaffold(
 
         bottomBar = {
-
             TaskendaBottomBar(
                 selectedTab = selectedTab,
                 onTabSelected = { tab ->
-
-                    if (
-                        tab != selectedTab
-                    ) {
-
+                    if (tab != selectedTab) {
                         haptic.performHapticFeedback(
                             HapticFeedbackType.VirtualKey
                         )
@@ -380,7 +284,6 @@ private fun TaskendaScreen() {
                 }
             )
         },
-
 
         floatingActionButton = {
 
@@ -393,12 +296,10 @@ private fun TaskendaScreen() {
                     )
 
                     editingTask = null
-
                     showEditor = true
                 },
 
-                modifier =
-                    Modifier.size(56.dp),
+                modifier = Modifier.size(56.dp),
 
                 shape =
                     RoundedCornerShape(18.dp),
@@ -416,7 +317,6 @@ private fun TaskendaScreen() {
             ) {
 
                 Icon(
-
                     imageVector =
                         Icons.Rounded.Add,
 
@@ -446,20 +346,15 @@ private fun TaskendaScreen() {
 
             TaskendaHeader(
                 selectedTab = selectedTab,
-                taskCount =
-                    visibleTasks.size
+                taskCount = visibleTasks.size
             )
-
 
             Spacer(
                 modifier =
                     Modifier.height(18.dp)
             )
 
-
-            if (
-                visibleTasks.isEmpty()
-            ) {
+            if (visibleTasks.isEmpty()) {
 
                 EmptyTasks(
                     selectedTab = selectedTab
@@ -478,9 +373,7 @@ private fun TaskendaScreen() {
                         ),
 
                     verticalArrangement =
-                        Arrangement.spacedBy(
-                            10.dp
-                        )
+                        Arrangement.spacedBy(10.dp)
 
                 ) {
 
@@ -505,8 +398,7 @@ private fun TaskendaScreen() {
                                     tasks[index] =
                                         tasks[index].copy(
                                             completed =
-                                                !tasks[index]
-                                                    .completed
+                                                !tasks[index].completed
                                         )
 
                                     haptic.performHapticFeedback(
@@ -529,8 +421,7 @@ private fun TaskendaScreen() {
                                     tasks[index] =
                                         tasks[index].copy(
                                             important =
-                                                !tasks[index]
-                                                    .important
+                                                !tasks[index].important
                                         )
 
                                     haptic.performHapticFeedback(
@@ -542,14 +433,11 @@ private fun TaskendaScreen() {
                             },
 
                             onEdit = {
-
                                 editingTask = task
-
                                 showEditor = true
                             },
 
                             onDelete = {
-
                                 taskToDelete = task
                             }
                         )
@@ -558,7 +446,6 @@ private fun TaskendaScreen() {
             }
         }
     }
-
 
     if (showEditor) {
 
@@ -569,33 +456,23 @@ private fun TaskendaScreen() {
             onDismiss = {
 
                 showEditor = false
-
                 editingTask = null
             },
 
             onSave = {
-                    title: String,
-                    notes: String,
-                    important: Boolean,
-                    dueDate: String ->
+                title,
+                notes,
+                important,
+                dueDate ->
 
-                if (
-                    editingTask == null
-                ) {
+                if (editingTask == null) {
 
                     tasks.add(
-
                         Task(
-
                             title = title,
-
                             notes = notes,
-
-                            important =
-                                important,
-
-                            dueDate =
-                                dueDate
+                            important = important,
+                            dueDate = dueDate
                         )
                     )
 
@@ -603,69 +480,48 @@ private fun TaskendaScreen() {
 
                     val index =
                         tasks.indexOfFirst {
-                            it.id ==
-                                editingTask!!.id
+                            it.id == editingTask!!.id
                         }
 
                     if (index >= 0) {
 
                         tasks[index] =
                             tasks[index].copy(
-
-                                title =
-                                    title,
-
-                                notes =
-                                    notes,
-
-                                important =
-                                    important,
-
-                                dueDate =
-                                    dueDate
+                                title = title,
+                                notes = notes,
+                                important = important,
+                                dueDate = dueDate
                             )
                     }
                 }
 
-
                 persist()
-
 
                 haptic.performHapticFeedback(
                     HapticFeedbackType.Confirm
                 )
 
-
                 showEditor = false
-
                 editingTask = null
             }
         )
     }
 
-
-    if (
-        taskToDelete != null
-    ) {
+    taskToDelete?.let { task ->
 
         AlertDialog(
 
             onDismissRequest = {
-
                 taskToDelete = null
             },
 
             title = {
-
-                Text(
-                    "Eliminar tarea"
-                )
+                Text("Eliminar tarea")
             },
 
             text = {
-
                 Text(
-                    "¿Quieres eliminar «${taskToDelete!!.title}»?"
+                    "¿Quieres eliminar «${task.title}»?"
                 )
             },
 
@@ -676,9 +532,7 @@ private fun TaskendaScreen() {
                     onClick = {
 
                         tasks.removeAll {
-
-                            it.id ==
-                                taskToDelete!!.id
+                            it.id == task.id
                         }
 
                         persist()
@@ -690,26 +544,18 @@ private fun TaskendaScreen() {
                         taskToDelete = null
                     }
                 ) {
-
-                    Text(
-                        "Eliminar"
-                    )
+                    Text("Eliminar")
                 }
             },
 
             dismissButton = {
 
                 TextButton(
-
                     onClick = {
-
                         taskToDelete = null
                     }
                 ) {
-
-                    Text(
-                        "Cancelar"
-                    )
+                    Text("Cancelar")
                 }
             }
         )
@@ -717,17 +563,1748 @@ private fun TaskendaScreen() {
 }
 
 
-/*
- * BARRA INFERIOR
- *
- * No hay animaciones.
- *
- * Los cuatro elementos tienen posiciones
- * estables y cada uno dispone del mismo
- * espacio disponible.
- *
- * Esto evita que al seleccionar una opción
- * los otros iconos se desplacen.
- */
+/* -------------------------------------------------------------------------- */
+/* BARRA INFERIOR                                                             */
+/* -------------------------------------------------------------------------- */
+
 @Composable
-private fun TaskendaBottomBar
+private fun TaskendaBottomBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit
+) {
+
+    Surface(
+
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(
+                    start = 14.dp,
+                    end = 14.dp,
+                    bottom = 7.dp
+                ),
+
+        shape =
+            RoundedCornerShape(26.dp),
+
+        color =
+            MaterialTheme
+                .colorScheme
+                .surfaceContainerHigh,
+
+        tonalElevation = 4.dp,
+
+        shadowElevation = 5.dp
+
+    ) {
+
+        /*
+         * BoxWithConstraints nos da el ancho real
+         * disponible en cualquier dispositivo.
+         *
+         * La barra se divide en cuatro posiciones
+         * exactamente iguales.
+         */
+        BoxWithConstraints(
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(62.dp)
+
+        ) {
+
+            val slotWidth =
+                maxWidth / 4f
+
+            Row(
+
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(
+                            horizontal = 4.dp
+                        ),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                TaskNavItem(
+                    selected =
+                        selectedTab == 0,
+
+                    icon =
+                        Icons.Rounded.Home,
+
+                    label =
+                        "Inicio",
+
+                    slotWidth =
+                        slotWidth,
+
+                    onClick = {
+                        onTabSelected(0)
+                    }
+                )
+
+                TaskNavItem(
+                    selected =
+                        selectedTab == 1,
+
+                    icon =
+                        Icons.Rounded.Upcoming,
+
+                    label =
+                        "Pendientes",
+
+                    slotWidth =
+                        slotWidth,
+
+                    onClick = {
+                        onTabSelected(1)
+                    }
+                )
+
+                TaskNavItem(
+                    selected =
+                        selectedTab == 2,
+
+                    icon =
+                        if (selectedTab == 2) {
+                            Icons.Rounded.Star
+                        } else {
+                            Icons.Rounded.StarBorder
+                        },
+
+                    label =
+                        "Importantes",
+
+                    slotWidth =
+                        slotWidth,
+
+                    onClick = {
+                        onTabSelected(2)
+                    }
+                )
+
+                TaskNavItem(
+                    selected =
+                        selectedTab == 3,
+
+                    icon =
+                        Icons.Rounded.Check,
+
+                    label =
+                        "Hechas",
+
+                    slotWidth =
+                        slotWidth,
+
+                    onClick = {
+                        onTabSelected(3)
+                    }
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun TaskNavItem(
+    selected: Boolean,
+    icon: ImageVector,
+    label: String,
+    slotWidth: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+
+    Box(
+
+        modifier =
+            Modifier
+                .width(slotWidth)
+                .fillMaxHeight(),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+
+        Surface(
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 2.dp
+                    )
+                    .height(48.dp)
+                    .clickable(
+                        onClick = onClick
+                    ),
+
+            shape =
+                RoundedCornerShape(18.dp),
+
+            color =
+                if (selected) {
+                    MaterialTheme
+                        .colorScheme
+                        .primaryContainer
+                } else {
+                    Color.Transparent
+                }
+
+        ) {
+
+            Row(
+
+                modifier =
+                    Modifier.fillMaxSize(),
+
+                horizontalArrangement =
+                    Arrangement.Center,
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Icon(
+
+                    imageVector =
+                        icon,
+
+                    contentDescription =
+                        label,
+
+                    modifier =
+                        Modifier.size(21.dp),
+
+                    tint =
+                        if (selected) {
+
+                            MaterialTheme
+                                .colorScheme
+                                .onPrimaryContainer
+
+                        } else {
+
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                        }
+                )
+
+
+                if (selected) {
+
+                    Spacer(
+                        modifier =
+                            Modifier.width(5.dp)
+                    )
+
+                    Text(
+
+                        text =
+                            label,
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelSmall,
+
+                        fontWeight =
+                            FontWeight.SemiBold,
+
+                        maxLines = 1,
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onPrimaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* CABECERA                                                                   */
+/* -------------------------------------------------------------------------- */
+
+@Composable
+private fun TaskendaHeader(
+    selectedTab: Int,
+    taskCount: Int
+) {
+
+    val title =
+        when (selectedTab) {
+
+            1 ->
+                "Pendientes"
+
+            2 ->
+                "Importantes"
+
+            3 ->
+                "Completadas"
+
+            else ->
+                "Mis tareas"
+        }
+
+
+    val subtitle =
+        when (taskCount) {
+
+            0 ->
+                "Todo al día"
+
+            1 ->
+                "1 tarea"
+
+            else ->
+                "$taskCount tareas"
+        }
+
+
+    Row(
+
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
+        Column(
+
+            modifier =
+                Modifier.weight(1f)
+        ) {
+
+            Text(
+
+                text =
+                    title,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .headlineLarge,
+
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(2.dp)
+            )
+
+            Text(
+
+                text =
+                    subtitle,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyLarge,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+        }
+
+
+        Surface(
+
+            modifier =
+                Modifier.size(48.dp),
+
+            shape =
+                CircleShape,
+
+            color =
+                MaterialTheme
+                    .colorScheme
+                    .primaryContainer
+        ) {
+
+            Box(
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                Icon(
+
+                    imageVector =
+                        Icons.Rounded.TaskAlt,
+
+                    contentDescription =
+                        null,
+
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .onPrimaryContainer
+                )
+            }
+        }
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* ESTADO VACÍO                                                              */
+/* -------------------------------------------------------------------------- */
+
+@Composable
+private fun EmptyTasks(
+    selectedTab: Int
+) {
+
+    val title =
+        when (selectedTab) {
+
+            2 ->
+                "Nada importante"
+
+            3 ->
+                "Aún no hay tareas hechas"
+
+            else ->
+                "No tienes tareas"
+        }
+
+
+    val subtitle =
+        when (selectedTab) {
+
+            2 ->
+                "Marca una tarea como importante para verla aquí."
+
+            3 ->
+                "Las tareas completadas aparecerán aquí."
+
+            else ->
+                "Pulsa el botón + para crear tu primera tarea."
+        }
+
+
+    Box(
+
+        modifier =
+            Modifier.fillMaxSize(),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+
+        Column(
+
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+
+            modifier =
+                Modifier.padding(32.dp)
+        ) {
+
+            Surface(
+
+                modifier =
+                    Modifier.size(82.dp),
+
+                shape =
+                    CircleShape,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .surfaceContainerHigh
+            ) {
+
+                Box(
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+
+                    Icon(
+
+                        imageVector =
+                            when (selectedTab) {
+
+                                2 ->
+                                    Icons.Rounded.Star
+
+                                3 ->
+                                    Icons.Rounded.Check
+
+                                else ->
+                                    Icons.Rounded.TaskAlt
+                            },
+
+                        contentDescription =
+                            null,
+
+                        modifier =
+                            Modifier.size(37.dp),
+
+                        tint =
+                            MaterialTheme
+                                .colorScheme
+                                .primary
+                    )
+                }
+            }
+
+
+            Spacer(
+                modifier =
+                    Modifier.height(16.dp)
+            )
+
+
+            Text(
+
+                text =
+                    title,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .titleLarge,
+
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+
+            Spacer(
+                modifier =
+                    Modifier.height(5.dp)
+            )
+
+
+            Text(
+
+                text =
+                    subtitle,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyMedium,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+        }
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* TAREA                                                                      */
+/* -------------------------------------------------------------------------- */
+
+@Composable
+private fun TaskRow(
+    task: Task,
+    onToggle: () -> Unit,
+    onImportant: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+
+    var menuVisible by remember {
+        mutableStateOf(false)
+    }
+
+
+    Card(
+
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClick = onEdit
+                ),
+
+        shape =
+            RoundedCornerShape(21.dp),
+
+        colors =
+            CardDefaults.cardColors(
+
+                containerColor =
+                    if (task.completed) {
+
+                        MaterialTheme
+                            .colorScheme
+                            .surfaceContainerLow
+
+                    } else {
+
+                        MaterialTheme
+                            .colorScheme
+                            .surfaceContainer
+                    }
+            ),
+
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 0.dp
+            )
+
+    ) {
+
+        Row(
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 8.dp,
+                        end = 5.dp,
+                        top = 8.dp,
+                        bottom = 8.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            TaskCheckbox(
+
+                checked =
+                    task.completed,
+
+                onClick =
+                    onToggle
+            )
+
+
+            Spacer(
+                modifier =
+                    Modifier.width(10.dp)
+            )
+
+
+            Column(
+
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+
+                Text(
+
+                    text =
+                        task.title,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyLarge,
+
+                    fontWeight =
+                        FontWeight.Medium,
+
+                    textDecoration =
+                        if (task.completed) {
+
+                            TextDecoration.LineThrough
+
+                        } else {
+
+                            TextDecoration.None
+                        },
+
+                    color =
+                        if (task.completed) {
+
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+
+                        } else {
+
+                            MaterialTheme
+                                .colorScheme
+                                .onSurface
+                        }
+                )
+
+
+                if (task.notes.isNotBlank()) {
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(2.dp)
+                    )
+
+
+                    Text(
+
+                        text =
+                            task.notes,
+
+                        maxLines = 2,
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                    )
+                }
+
+
+                if (task.dueDate.isNotBlank()) {
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(4.dp)
+                    )
+
+
+                    Row(
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+
+                        Icon(
+
+                            imageVector =
+                                Icons.Rounded.Today,
+
+                            contentDescription =
+                                null,
+
+                            modifier =
+                                Modifier.size(14.dp),
+
+                            tint =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary
+                        )
+
+
+                        Spacer(
+                            modifier =
+                                Modifier.width(4.dp)
+                        )
+
+
+                        Text(
+
+                            text =
+                                task.dueDate,
+
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .labelMedium,
+
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary
+                        )
+                    }
+                }
+            }
+
+
+            IconButton(
+
+                onClick =
+                    onImportant
+
+            ) {
+
+                Icon(
+
+                    imageVector =
+                        if (task.important) {
+
+                            Icons.Rounded.Star
+
+                        } else {
+
+                            Icons.Rounded.StarBorder
+                        },
+
+                    contentDescription =
+                        if (task.important) {
+
+                            "Quitar de importantes"
+
+                        } else {
+
+                            "Marcar como importante"
+                        },
+
+                    tint =
+                        if (task.important) {
+
+                            MaterialTheme
+                                .colorScheme
+                                .primary
+
+                        } else {
+
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                        }
+                )
+            }
+
+
+            Box {
+
+                IconButton(
+
+                    onClick = {
+
+                        menuVisible =
+                            !menuVisible
+                    }
+
+                ) {
+
+                    Icon(
+
+                        imageVector =
+                            Icons.Rounded.MoreVert,
+
+                        contentDescription =
+                            "Más opciones"
+                    )
+                }
+
+
+                DropdownMenu(
+
+                    expanded =
+                        menuVisible,
+
+                    onDismissRequest = {
+
+                        menuVisible = false
+                    }
+
+                ) {
+
+                    DropdownMenuItem(
+
+                        text = {
+                            Text("Editar")
+                        },
+
+                        leadingIcon = {
+
+                            Icon(
+
+                                imageVector =
+                                    Icons.Rounded.Edit,
+
+                                contentDescription =
+                                    null
+                            )
+                        },
+
+                        onClick = {
+
+                            menuVisible = false
+
+                            onEdit()
+                        }
+                    )
+
+
+                    DropdownMenuItem(
+
+                        text = {
+                            Text("Eliminar")
+                        },
+
+                        leadingIcon = {
+
+                            Icon(
+
+                                imageVector =
+                                    Icons.Rounded.Delete,
+
+                                contentDescription =
+                                    null
+                            )
+                        },
+
+                        onClick = {
+
+                            menuVisible = false
+
+                            onDelete()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* CHECKBOX                                                                   */
+/* -------------------------------------------------------------------------- */
+
+@Composable
+private fun TaskCheckbox(
+    checked: Boolean,
+    onClick: () -> Unit
+) {
+
+    Surface(
+
+        modifier =
+            Modifier
+                .size(43.dp)
+                .clickable(
+                    onClick = onClick
+                ),
+
+        shape =
+            CircleShape,
+
+        color =
+            if (checked) {
+
+                MaterialTheme
+                    .colorScheme
+                    .primary
+
+            } else {
+
+                Color.Transparent
+            },
+
+        border =
+            if (checked) {
+
+                null
+
+            } else {
+
+                BorderStroke(
+                    2.dp,
+                    MaterialTheme
+                        .colorScheme
+                        .outline
+                )
+            }
+
+    ) {
+
+        Box(
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            if (checked) {
+
+                Icon(
+
+                    imageVector =
+                        Icons.Rounded.Check,
+
+                    contentDescription =
+                        null,
+
+                    modifier =
+                        Modifier.size(24.dp),
+
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .onPrimary
+                )
+            }
+        }
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* EDITOR                                                                     */
+/* -------------------------------------------------------------------------- */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskEditorSheet(
+    task: Task?,
+    onDismiss: () -> Unit,
+    onSave: (
+        title: String,
+        notes: String,
+        important: Boolean,
+        dueDate: String
+    ) -> Unit
+) {
+
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true
+        )
+
+
+    var title by remember(task?.id) {
+
+        mutableStateOf(
+            task?.title ?: ""
+        )
+    }
+
+
+    var notes by remember(task?.id) {
+
+        mutableStateOf(
+            task?.notes ?: ""
+        )
+    }
+
+
+    var important by remember(task?.id) {
+
+        mutableStateOf(
+            task?.important ?: false
+        )
+    }
+
+
+    var dueDate by remember(task?.id) {
+
+        mutableStateOf(
+            task?.dueDate
+                ?: todayString()
+        )
+    }
+
+
+    var showDatePicker by remember {
+
+        mutableStateOf(false)
+    }
+
+
+    ModalBottomSheet(
+
+        onDismissRequest =
+            onDismiss,
+
+        sheetState =
+            sheetState,
+
+        shape =
+            RoundedCornerShape(
+                topStart = 30.dp,
+                topEnd = 30.dp
+            )
+
+    ) {
+
+        Column(
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.90f)
+                    .imePadding()
+                    .padding(
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = 10.dp
+                    )
+        ) {
+
+            Box(
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            bottom = 10.dp
+                        ),
+
+                contentAlignment =
+                    Alignment.Center
+
+            ) {
+
+                Surface(
+
+                    modifier =
+                        Modifier.size(
+                            width = 34.dp,
+                            height = 4.dp
+                        ),
+
+                    shape =
+                        RoundedCornerShape(99.dp),
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
+                            .copy(
+                                alpha = 0.45f
+                            )
+
+                ) {}
+            }
+
+
+            Column(
+
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
+
+            ) {
+
+                Text(
+
+                    text =
+                        if (task == null) {
+                            "Nueva tarea"
+                        } else {
+                            "Editar tarea"
+                        },
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .headlineSmall,
+
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+
+                Spacer(
+                    modifier =
+                        Modifier.height(18.dp)
+                )
+
+
+                OutlinedTextField(
+
+                    value =
+                        title,
+
+                    onValueChange = {
+                        title = it
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    singleLine = true,
+
+                    label = {
+                        Text("Tarea")
+                    },
+
+                    leadingIcon = {
+
+                        Icon(
+
+                            imageVector =
+                                Icons.Rounded.TaskAlt,
+
+                            contentDescription =
+                                null
+                        )
+                    },
+
+                    shape =
+                        RoundedCornerShape(18.dp)
+                )
+
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+
+                OutlinedTextField(
+
+                    value =
+                        notes,
+
+                    onValueChange = {
+                        notes = it
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    minLines = 3,
+
+                    maxLines = 5,
+
+                    label = {
+                        Text("Notas")
+                    },
+
+                    shape =
+                        RoundedCornerShape(18.dp)
+                )
+
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+
+                TaskDateField(
+
+                    date =
+                        dueDate,
+
+                    onClick = {
+
+                        showDatePicker = true
+                    }
+                )
+
+
+                Spacer(
+                    modifier =
+                        Modifier.height(10.dp)
+                )
+
+
+                Surface(
+
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+
+                                important =
+                                    !important
+                            },
+
+                    shape =
+                        RoundedCornerShape(18.dp),
+
+                    color =
+                        if (important) {
+
+                            MaterialTheme
+                                .colorScheme
+                                .primaryContainer
+
+                        } else {
+
+                            MaterialTheme
+                                .colorScheme
+                                .surfaceContainer
+                        }
+
+                ) {
+
+                    Row(
+
+                        modifier =
+                            Modifier.padding(15.dp),
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
+
+                    ) {
+
+                        Icon(
+
+                            imageVector =
+                                if (important) {
+
+                                    Icons.Rounded.Star
+
+                                } else {
+
+                                    Icons.Rounded.StarBorder
+                                },
+
+                            contentDescription =
+                                null,
+
+                            tint =
+                                if (important) {
+
+                                    MaterialTheme
+                                        .colorScheme
+                                        .primary
+
+                                } else {
+
+                                    MaterialTheme
+                                        .colorScheme
+                                        .onSurfaceVariant
+                                }
+                        )
+
+
+                        Spacer(
+                            modifier =
+                                Modifier.width(12.dp)
+                        )
+
+
+                        Text(
+
+                            text =
+                                "Marcar como importante",
+
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+
+
+                        Switch(
+
+                            checked =
+                                important,
+
+                            onCheckedChange = {
+
+                                important = it
+                            }
+                        )
+                    }
+                }
+
+
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
+            }
+
+
+            Button(
+
+                onClick = {
+
+                    val cleanTitle =
+                        title.trim()
+
+                    if (
+                        cleanTitle.isNotEmpty()
+                    ) {
+
+                        onSave(
+
+                            cleanTitle,
+
+                            notes.trim(),
+
+                            important,
+
+                            dueDate
+                        )
+                    }
+                },
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+
+                shape =
+                    RoundedCornerShape(18.dp)
+
+            ) {
+
+                Icon(
+
+                    imageVector =
+                        Icons.Rounded.Check,
+
+                    contentDescription =
+                        null
+                )
+
+
+                Spacer(
+                    modifier =
+                        Modifier.width(8.dp)
+                )
+
+
+                Text(
+
+                    text =
+                        if (task == null) {
+                            "Crear tarea"
+                        } else {
+                            "Guardar cambios"
+                        }
+                )
+            }
+        }
+    }
+
+
+    if (showDatePicker) {
+
+        TaskDatePickerDialog(
+
+            currentDate =
+                dueDate,
+
+            onDismiss = {
+
+                showDatePicker = false
+            },
+
+            onDateSelected = { date ->
+
+                dueDate = date
+
+                showDatePicker = false
+            }
+        )
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* CAMPO FECHA                                                                */
+/* -------------------------------------------------------------------------- */
+
+@Composable
+private fun TaskDateField(
+    date: String,
+    onClick: () -> Unit
+) {
+
+    Surface(
+
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clickable(
+                    onClick = onClick
+                ),
+
+        shape =
+            RoundedCornerShape(18.dp),
+
+        color =
+            Color.Transparent,
+
+        border =
+            BorderStroke(
+                1.dp,
+                MaterialTheme
+                    .colorScheme
+                    .outline
+            )
+
+    ) {
+
+        Row(
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = 14.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            Icon(
+
+                imageVector =
+                    Icons.Rounded.Today,
+
+                contentDescription =
+                    "Seleccionar fecha",
+
+                modifier =
+                    Modifier.size(20.dp),
+
+                tint =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+
+
+            Spacer(
+                modifier =
+                    Modifier.width(12.dp)
+            )
+
+
+            Column {
+
+                Text(
+
+                    text =
+                        "Fecha",
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelSmall,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
+                )
+
+
+                Text(
+
+                    text =
+                        date,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurface
+                )
+            }
+        }
+    }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* CALENDARIO                                                                 */
+/* -------------------------------------------------------------------------- */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskDatePickerDialog(
+    currentDate: String,
+    onDismiss: () -> Unit,
+    onDateSelected: (String) -> Unit
+) {
+
+    val initialMillis =
+        remember(currentDate) {
+
+            parseDateMillis(
+                currentDate
+            )
+        }
+
+
+    val datePickerState =
+        rememberDatePickerState(
+
+            initialSelectedDateMillis =
+                initialMillis
+        )
+
+
+    DatePickerDialog(
+
+        onDismissRequest =
+            onDismiss,
+
+        confirmButton = {
+
+            TextButton(
+
+                onClick = {
+
+                    val millis =
+                        datePickerState
+                            .selectedDateMillis
+
+                    if (millis != null) {
+
+                        onDateSelected(
+                            formatDate(millis)
+                        )
+
+                    } else {
+
+                        onDismiss()
+                    }
+                }
+            ) {
+
+                Text("Aceptar")
+            }
+        },
+
+        dismissButton = {
+
+            TextButton(
+
+                onClick =
+                    onDismiss
+
+            ) {
+
+                Text("Cancelar")
+            }
+        }
+
+    ) {
+
+        DatePicker(
+
+            state =
+                datePickerState,
+
+            showModeToggle =
+                false
+        )
+    }
+}
+
+
+private fun todayString(): String {
+
+    return SimpleDateFormat(
+
+        "dd/MM/yyyy",
+
+        Locale.getDefault()
+
+    ).format(
+        Date()
+    )
+}
+
+
+private fun parseDateMillis(
+    value: String
+): Long {
+
+    return try {
+
+        val format =
+            SimpleDateFormat(
+
+                "dd/MM/yyyy",
+
+                Locale.getDefault()
+            )
+
+        format.isLenient =
+            false
+
+
+        val parsed =
+            format.parse(value)
+
+
+        if (parsed != null) {
+
+            val calendar =
+                Calendar.getInstance()
+
+            calendar.time =
+                parsed
+
+
+            calendar.set(
+                Calendar.HOUR_OF_DAY,
+                12
+            )
+
+            calendar.set(
+                Calendar.MINUTE,
+                0
+            )
+
+            calendar.set(
+                Calendar.SECOND,
+                0
+            )
+
+            calendar.set(
+                Calendar.MILLISECOND,
+                0
+            )
+
+
+            calendar.timeInMillis
+
+        } else {
+
+            Calendar
+                .getInstance()
+                .timeInMillis
+        }
+
+    } catch (_: Exception) {
+
+        Calendar
+            .getInstance()
+            .timeInMillis
+    }
+}
+
+
+private fun formatDate(
+    millis: Long
+): String {
+
+    val calendar =
+        Calendar.getInstance()
+
+    calendar.timeInMillis =
+        millis
+
+    return SimpleDateFormat(
+
+        "dd/MM/yyyy",
+
+        Locale.getDefault()
+
+    ).format(
+        calendar.time
+    )
+}
