@@ -24,14 +24,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -44,13 +47,15 @@ import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material.icons.rounded.Upcoming
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +70,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -85,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -118,11 +125,8 @@ private object TaskStorage {
             val array = JSONArray(raw)
 
             buildList {
-
                 for (i in 0 until array.length()) {
-
-                    val item =
-                        array.getJSONObject(i)
+                    val item = array.getJSONObject(i)
 
                     add(
                         Task(
@@ -136,7 +140,6 @@ private object TaskStorage {
                     )
                 }
             }
-
         } catch (_: Exception) {
             emptyList()
         }
@@ -146,43 +149,18 @@ private object TaskStorage {
         context: Context,
         tasks: List<Task>
     ) {
-
         val array = JSONArray()
 
         tasks.forEach { task ->
 
             array.put(
                 JSONObject().apply {
-
-                    put(
-                        "id",
-                        task.id
-                    )
-
-                    put(
-                        "title",
-                        task.title
-                    )
-
-                    put(
-                        "notes",
-                        task.notes
-                    )
-
-                    put(
-                        "completed",
-                        task.completed
-                    )
-
-                    put(
-                        "important",
-                        task.important
-                    )
-
-                    put(
-                        "dueDate",
-                        task.dueDate
-                    )
+                    put("id", task.id)
+                    put("title", task.title)
+                    put("notes", task.notes)
+                    put("completed", task.completed)
+                    put("important", task.important)
+                    put("dueDate", task.dueDate)
                 }
             )
         }
@@ -218,9 +196,7 @@ class MainActivity : ComponentActivity() {
 private fun TaskendaApp() {
 
     val context = LocalContext.current
-
-    val darkTheme =
-        isSystemInDarkTheme()
+    val darkTheme = isSystemInDarkTheme()
 
     val colors =
         if (android.os.Build.VERSION.SDK_INT >= 31) {
@@ -247,17 +223,12 @@ private fun TaskendaApp() {
 @Composable
 private fun TaskendaScreen() {
 
-    val context =
-        LocalContext.current
-
-    val haptic =
-        LocalHapticFeedback.current
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
     val tasks =
         remember {
-
             mutableStateListOf<Task>().apply {
-
                 addAll(
                     TaskStorage.load(context)
                 )
@@ -281,7 +252,6 @@ private fun TaskendaScreen() {
     }
 
     fun persist() {
-
         TaskStorage.save(
             context,
             tasks.toList()
@@ -313,155 +283,26 @@ private fun TaskendaScreen() {
 
         bottomBar = {
 
-            BottomAppBar(
+            TaskendaBottomBar(
 
-                modifier =
-                    Modifier
-                        .navigationBarsPadding()
-                        .padding(
-                            start = 14.dp,
-                            end = 14.dp,
-                            bottom = 8.dp
-                        ),
+                selectedTab = selectedTab,
 
-                containerColor =
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                onTabSelected = { tab ->
 
-                tonalElevation = 3.dp,
+                    if (selectedTab != tab) {
 
-                contentPadding =
-                    PaddingValues(
-                        horizontal = 4.dp
-                    )
-
-            ) {
-
-                NavigationBarItem(
-
-                    selected =
-                        selectedTab == 0,
-
-                    onClick = {
-
-                        if (selectedTab != 0) {
-
-                            haptic.performHapticFeedback(
-                                HapticFeedbackType.VirtualKey
-                            )
-
-                            selectedTab = 0
-                        }
-                    },
-
-                    icon = {
-
-                        Icon(
-                            Icons.Rounded.Home,
-                            contentDescription = "Inicio"
+                        haptic.performHapticFeedback(
+                            HapticFeedbackType.VirtualKey
                         )
-                    },
 
-                    label = {
-                        Text("Inicio")
+                        selectedTab = tab
                     }
-                )
-
-                NavigationBarItem(
-
-                    selected =
-                        selectedTab == 1,
-
-                    onClick = {
-
-                        if (selectedTab != 1) {
-
-                            haptic.performHapticFeedback(
-                                HapticFeedbackType.VirtualKey
-                            )
-
-                            selectedTab = 1
-                        }
-                    },
-
-                    icon = {
-
-                        Icon(
-                            Icons.Rounded.Upcoming,
-                            contentDescription = "Pendientes"
-                        )
-                    },
-
-                    label = {
-                        Text("Pendientes")
-                    }
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.width(64.dp)
-                )
-
-                NavigationBarItem(
-
-                    selected =
-                        selectedTab == 2,
-
-                    onClick = {
-
-                        if (selectedTab != 2) {
-
-                            haptic.performHapticFeedback(
-                                HapticFeedbackType.VirtualKey
-                            )
-
-                            selectedTab = 2
-                        }
-                    },
-
-                    icon = {
-
-                        Icon(
-                            Icons.Rounded.Star,
-                            contentDescription = "Importantes"
-                        )
-                    },
-
-                    label = {
-                        Text("Importantes")
-                    }
-                )
-
-                NavigationBarItem(
-
-                    selected =
-                        selectedTab == 3,
-
-                    onClick = {
-
-                        if (selectedTab != 3) {
-
-                            haptic.performHapticFeedback(
-                                HapticFeedbackType.VirtualKey
-                            )
-
-                            selectedTab = 3
-                        }
-                    },
-
-                    icon = {
-
-                        Icon(
-                            Icons.Rounded.Check,
-                            contentDescription = "Completadas"
-                        )
-                    },
-
-                    label = {
-                        Text("Hechas")
-                    }
-                )
-            }
+                }
+            )
         },
+
+        floatingActionButtonPosition =
+            FabPosition.Center,
 
         floatingActionButton = {
 
@@ -474,12 +315,14 @@ private fun TaskendaScreen() {
                     )
 
                     editingTask = null
-
                     showAddSheet = true
                 },
 
+                modifier =
+                    Modifier.size(58.dp),
+
                 shape =
-                    RoundedCornerShape(20.dp),
+                    RoundedCornerShape(19.dp),
 
                 containerColor =
                     MaterialTheme.colorScheme.primaryContainer,
@@ -490,9 +333,14 @@ private fun TaskendaScreen() {
             ) {
 
                 Icon(
+
                     Icons.Rounded.Add,
+
                     contentDescription =
-                        "Añadir tarea"
+                        "Añadir tarea",
+
+                    modifier =
+                        Modifier.size(28.dp)
                 )
             }
         }
@@ -510,7 +358,6 @@ private fun TaskendaScreen() {
                         end = 18.dp,
                         top = 18.dp
                     )
-
         ) {
 
             TaskendaHeader(
@@ -538,13 +385,11 @@ private fun TaskendaScreen() {
 
                     contentPadding =
                         PaddingValues(
-                            bottom = 110.dp
+                            bottom = 90.dp
                         ),
 
                     verticalArrangement =
-                        Arrangement.spacedBy(
-                            10.dp
-                        )
+                        Arrangement.spacedBy(10.dp)
 
                 ) {
 
@@ -606,7 +451,6 @@ private fun TaskendaScreen() {
                             onEdit = {
 
                                 editingTask = task
-
                                 showAddSheet = true
                             },
 
@@ -630,7 +474,6 @@ private fun TaskendaScreen() {
             onDismiss = {
 
                 showAddSheet = false
-
                 editingTask = null
             },
 
@@ -678,7 +521,6 @@ private fun TaskendaScreen() {
                 )
 
                 showAddSheet = false
-
                 editingTask = null
             }
         )
@@ -744,9 +586,284 @@ private fun TaskendaScreen() {
 }
 
 @Composable
-private fun TaskendaHeader(
+private fun TaskendaBottomBar(
+
     selectedTab: Int,
+
+    onTabSelected: (Int) -> Unit
+
+) {
+
+    Surface(
+
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(
+                    start = 18.dp,
+                    end = 18.dp,
+                    bottom = 8.dp
+                ),
+
+        shape =
+            RoundedCornerShape(28.dp),
+
+        color =
+            MaterialTheme.colorScheme.surfaceContainerHigh,
+
+        tonalElevation = 5.dp,
+
+        shadowElevation = 6.dp
+
+    ) {
+
+        Row(
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(68.dp)
+                    .padding(
+                        horizontal = 5.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+
+        ) {
+
+            TaskNavItem(
+
+                selected =
+                    selectedTab == 0,
+
+                icon =
+                    Icons.Rounded.Home,
+
+                label =
+                    "Inicio",
+
+                onClick = {
+                    onTabSelected(0)
+                },
+
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            TaskNavItem(
+
+                selected =
+                    selectedTab == 1,
+
+                icon =
+                    Icons.Rounded.Upcoming,
+
+                label =
+                    "Pendientes",
+
+                onClick = {
+                    onTabSelected(1)
+                },
+
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.width(62.dp)
+            )
+
+            TaskNavItem(
+
+                selected =
+                    selectedTab == 2,
+
+                icon =
+                    Icons.Rounded.Star,
+
+                label =
+                    "Importantes",
+
+                onClick = {
+                    onTabSelected(2)
+                },
+
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            TaskNavItem(
+
+                selected =
+                    selectedTab == 3,
+
+                icon =
+                    Icons.Rounded.Check,
+
+                label =
+                    "Hechas",
+
+                onClick = {
+                    onTabSelected(3)
+                },
+
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskNavItem(
+
+    selected: Boolean,
+
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+
+    label: String,
+
+    onClick: () -> Unit,
+
+    modifier: Modifier = Modifier
+
+) {
+
+    val background by animateColorAsState(
+
+        targetValue =
+            if (selected) {
+
+                MaterialTheme.colorScheme.primaryContainer
+
+            } else {
+
+                Color.Transparent
+            },
+
+        animationSpec =
+            spring(
+                stiffness =
+                    Spring.StiffnessMediumLow
+            ),
+
+        label =
+            "navigationBackground"
+    )
+
+    val contentColor =
+        if (selected) {
+
+            MaterialTheme.colorScheme.onPrimaryContainer
+
+        } else {
+
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+
+    Surface(
+
+        modifier =
+            modifier
+                .height(56.dp)
+                .padding(
+                    vertical = 4.dp
+                )
+                .clickable(
+                    onClick = onClick
+                ),
+
+        shape =
+            RoundedCornerShape(22.dp),
+
+        color =
+            background
+
+    ) {
+
+        Row(
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = 7.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically,
+
+            horizontalArrangement =
+                Arrangement.Center
+
+        ) {
+
+            Icon(
+
+                imageVector = icon,
+
+                contentDescription =
+                    label,
+
+                modifier =
+                    Modifier.size(23.dp),
+
+                tint =
+                    contentColor
+            )
+
+            AnimatedVisibility(
+
+                visible =
+                    selected,
+
+                enter =
+                    fadeIn() + scaleIn(),
+
+                exit =
+                    fadeOut() + scaleOut()
+
+            ) {
+
+                Row {
+
+                    Spacer(
+                        modifier =
+                            Modifier.width(5.dp)
+                    )
+
+                    Text(
+
+                        text =
+                            label,
+
+                        style =
+                            MaterialTheme.typography.labelMedium,
+
+                        fontWeight =
+                            FontWeight.SemiBold,
+
+                        color =
+                            contentColor,
+
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskendaHeader(
+
+    selectedTab: Int,
+
     taskCount: Int
+
 ) {
 
     val title =
@@ -788,7 +905,8 @@ private fun TaskendaHeader(
 
             Text(
 
-                text = title,
+                text =
+                    title,
 
                 style =
                     MaterialTheme.typography.headlineLarge,
@@ -804,7 +922,8 @@ private fun TaskendaHeader(
 
             Text(
 
-                text = subtitle,
+                text =
+                    subtitle,
 
                 style =
                     MaterialTheme.typography.bodyLarge,
@@ -914,17 +1033,18 @@ private fun EmptyTasks(
 
                     Icon(
 
-                        when (selectedTab) {
+                        imageVector =
+                            when (selectedTab) {
 
-                            2 ->
-                                Icons.Rounded.Star
+                                2 ->
+                                    Icons.Rounded.Star
 
-                            3 ->
-                                Icons.Rounded.Check
+                                3 ->
+                                    Icons.Rounded.Check
 
-                            else ->
-                                Icons.Rounded.TaskAlt
-                        },
+                                else ->
+                                    Icons.Rounded.TaskAlt
+                            },
 
                         contentDescription = null,
 
@@ -1005,7 +1125,8 @@ private fun TaskRow(
                     Spring.StiffnessMediumLow
             ),
 
-        label = "taskContainer"
+        label =
+            "taskContainer"
     )
 
     var menuVisible by remember {
@@ -1044,9 +1165,9 @@ private fun TaskRow(
                     .fillMaxWidth()
                     .padding(
                         start = 8.dp,
-                        end = 8.dp,
-                        top = 10.dp,
-                        bottom = 10.dp
+                        end = 6.dp,
+                        top = 9.dp,
+                        bottom = 9.dp
                     ),
 
             verticalAlignment =
@@ -1252,7 +1373,6 @@ private fun TaskRow(
                         onClick = {
 
                             menuVisible = false
-
                             onEdit()
                         }
                     )
@@ -1274,7 +1394,6 @@ private fun TaskRow(
                         onClick = {
 
                             menuVisible = false
-
                             onDelete()
                         }
                     )
@@ -1311,7 +1430,8 @@ private fun TaskCheckbox(
                     Spring.StiffnessMedium
             ),
 
-        label = "checkboxBackground"
+        label =
+            "checkboxBackground"
     )
 
     val borderColor =
@@ -1328,7 +1448,7 @@ private fun TaskCheckbox(
 
         modifier =
             Modifier
-                .size(46.dp)
+                .size(44.dp)
                 .clickable(
                     onClick = onClick
                 ),
@@ -1380,7 +1500,7 @@ private fun TaskCheckbox(
                     contentDescription = null,
 
                     modifier =
-                        Modifier.size(25.dp),
+                        Modifier.size(24.dp),
 
                     tint =
                         MaterialTheme.colorScheme.onPrimary
@@ -1436,13 +1556,12 @@ private fun TaskEditorSheet(
     var dueDate by remember(task?.id) {
 
         mutableStateOf(
-
-            task?.dueDate
-                ?: SimpleDateFormat(
-                    "dd/MM/yyyy",
-                    Locale.getDefault()
-                ).format(Date())
+            task?.dueDate ?: todayString()
         )
+    }
+
+    var showDatePicker by remember {
+        mutableStateOf(false)
     }
 
     ModalBottomSheet(
@@ -1466,13 +1585,52 @@ private fun TaskEditorSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .imePadding()
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
                     .padding(
                         start = 20.dp,
                         end = 20.dp,
-                        bottom = 28.dp
+                        bottom = 24.dp
                     )
 
         ) {
+
+            Box(
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            bottom = 14.dp
+                        ),
+
+                contentAlignment =
+                    Alignment.Center
+
+            ) {
+
+                Surface(
+
+                    modifier =
+                        Modifier.size(
+                            width = 34.dp,
+                            height = 4.dp
+                        ),
+
+                    shape =
+                        RoundedCornerShape(99.dp),
+
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
+                            .copy(
+                                alpha = 0.45f
+                            )
+
+                ) {}
+            }
 
             Text(
 
@@ -1519,7 +1677,9 @@ private fun TaskEditorSheet(
                 leadingIcon = {
 
                     Icon(
+
                         Icons.Rounded.TaskAlt,
+
                         contentDescription = null
                     )
                 },
@@ -1567,12 +1727,16 @@ private fun TaskEditorSheet(
                 value =
                     dueDate,
 
-                onValueChange = {
-                    dueDate = it
-                },
+                onValueChange = {},
 
                 modifier =
-                    Modifier.fillMaxWidth(),
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showDatePicker = true
+                        },
+
+                readOnly = true,
 
                 singleLine = true,
 
@@ -1583,7 +1747,9 @@ private fun TaskEditorSheet(
                 leadingIcon = {
 
                     Icon(
+
                         Icons.Rounded.Today,
+
                         contentDescription = null
                     )
                 },
@@ -1739,4 +1905,154 @@ private fun TaskEditorSheet(
             }
         }
     }
+
+    if (showDatePicker) {
+
+        TaskDatePickerDialog(
+
+            currentDate =
+                dueDate,
+
+            onDismiss = {
+
+                showDatePicker = false
+            },
+
+            onDateSelected = { date ->
+
+                dueDate = date
+                showDatePicker = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskDatePickerDialog(
+
+    currentDate: String,
+
+    onDismiss: () -> Unit,
+
+    onDateSelected: (String) -> Unit
+
+) {
+
+    val initialMillis =
+        remember(currentDate) {
+            parseDateMillis(currentDate)
+        }
+
+    val datePickerState =
+        rememberDatePickerState(
+            initialSelectedDateMillis =
+                initialMillis
+        )
+
+    DatePickerDialog(
+
+        onDismissRequest =
+            onDismiss,
+
+        confirmButton = {
+
+            TextButton(
+
+                onClick = {
+
+                    val millis =
+                        datePickerState
+                            .selectedDateMillis
+
+                    if (millis != null) {
+
+                        onDateSelected(
+                            formatDate(millis)
+                        )
+
+                    } else {
+
+                        onDismiss()
+                    }
+                }
+
+            ) {
+
+                Text("Aceptar")
+            }
+        },
+
+        dismissButton = {
+
+            TextButton(
+                onClick = onDismiss
+            ) {
+
+                Text("Cancelar")
+            }
+        }
+
+    ) {
+
+        DatePicker(
+
+            state =
+                datePickerState,
+
+            showModeToggle =
+                false
+        )
+    }
+}
+
+private fun todayString(): String {
+
+    return SimpleDateFormat(
+
+        "dd/MM/yyyy",
+
+        Locale.getDefault()
+
+    ).format(Date())
+}
+
+private fun parseDateMillis(
+    value: String
+): Long {
+
+    return try {
+
+        val format =
+            SimpleDateFormat(
+                "dd/MM/yyyy",
+                Locale.getDefault()
+            )
+
+        format.isLenient = false
+
+        format.parse(value)?.time
+            ?: Calendar.getInstance()
+                .timeInMillis
+
+    } catch (_: Exception) {
+
+        Calendar.getInstance()
+            .timeInMillis
+    }
+}
+
+private fun formatDate(
+    millis: Long
+): String {
+
+    return SimpleDateFormat(
+
+        "dd/MM/yyyy",
+
+        Locale.getDefault()
+
+    ).format(
+        Date(millis)
+    )
 }
