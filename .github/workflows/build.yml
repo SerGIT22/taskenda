@@ -2,44 +2,48 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
+    name: Compilar APK
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
     steps:
-      - name: Checkout
+      - name: Descargar código
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
-      - name: Set up Gradle
+      - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.1'
 
-      - name: Set up Android SDK
+      - name: Instalar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages
+      - name: Conceder permisos al Gradle Wrapper
+        run: chmod +x ./gradlew
+
+      - name: Compilar APK Debug
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Comprobar APK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0"
+          echo "APKs generados:"
+          find app/build/outputs/apk -type f -name "*.apk" -print
 
-      - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
-
-      - name: Upload APK
+      - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
           name: Taskenda-debug
