@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -13,8 +12,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,8 +37,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Event
-import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Star
@@ -50,6 +48,8 @@ import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -60,6 +60,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -74,7 +75,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -82,7 +82,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.isSystemInDarkTheme
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -106,13 +105,24 @@ private object TaskStorage {
 
     fun load(context: Context): List<Task> {
         return try {
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val raw = prefs.getString(TASKS, "[]") ?: "[]"
+            val prefs = context.getSharedPreferences(
+                PREFS,
+                Context.MODE_PRIVATE
+            )
+
+            val raw = prefs.getString(
+                TASKS,
+                "[]"
+            ) ?: "[]"
+
             val array = JSONArray(raw)
 
             buildList {
+
                 for (i in 0 until array.length()) {
-                    val item = array.getJSONObject(i)
+
+                    val item =
+                        array.getJSONObject(i)
 
                     add(
                         Task(
@@ -126,6 +136,7 @@ private object TaskStorage {
                     )
                 }
             }
+
         } catch (_: Exception) {
             emptyList()
         }
@@ -135,32 +146,66 @@ private object TaskStorage {
         context: Context,
         tasks: List<Task>
     ) {
+
         val array = JSONArray()
 
         tasks.forEach { task ->
+
             array.put(
                 JSONObject().apply {
-                    put("id", task.id)
-                    put("title", task.title)
-                    put("notes", task.notes)
-                    put("completed", task.completed)
-                    put("important", task.important)
-                    put("dueDate", task.dueDate)
+
+                    put(
+                        "id",
+                        task.id
+                    )
+
+                    put(
+                        "title",
+                        task.title
+                    )
+
+                    put(
+                        "notes",
+                        task.notes
+                    )
+
+                    put(
+                        "completed",
+                        task.completed
+                    )
+
+                    put(
+                        "important",
+                        task.important
+                    )
+
+                    put(
+                        "dueDate",
+                        task.dueDate
+                    )
                 }
             )
         }
 
         context
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getSharedPreferences(
+                PREFS,
+                Context.MODE_PRIVATE
+            )
             .edit()
-            .putString(TASKS, array.toString())
+            .putString(
+                TASKS,
+                array.toString()
+            )
             .apply()
     }
 }
 
 class MainActivity : ComponentActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
         super.onCreate(savedInstanceState)
 
         setContent {
@@ -173,16 +218,21 @@ class MainActivity : ComponentActivity() {
 private fun TaskendaApp() {
 
     val context = LocalContext.current
-    val darkTheme = isSystemInDarkTheme()
+
+    val darkTheme =
+        isSystemInDarkTheme()
 
     val colors =
         if (android.os.Build.VERSION.SDK_INT >= 31) {
+
             if (darkTheme) {
                 dynamicDarkColorScheme(context)
             } else {
                 dynamicLightColorScheme(context)
             }
+
         } else {
+
             MaterialTheme.colorScheme
         }
 
@@ -197,16 +247,22 @@ private fun TaskendaApp() {
 @Composable
 private fun TaskendaScreen() {
 
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
+    val context =
+        LocalContext.current
 
-    val tasks = remember {
-        mutableStateListOf<Task>().apply {
-            addAll(
-                TaskStorage.load(context)
-            )
+    val haptic =
+        LocalHapticFeedback.current
+
+    val tasks =
+        remember {
+
+            mutableStateListOf<Task>().apply {
+
+                addAll(
+                    TaskStorage.load(context)
+                )
+            }
         }
-    }
 
     var selectedTab by remember {
         mutableIntStateOf(0)
@@ -225,6 +281,7 @@ private fun TaskendaScreen() {
     }
 
     fun persist() {
+
         TaskStorage.save(
             context,
             tasks.toList()
@@ -239,7 +296,8 @@ private fun TaskendaScreen() {
             }
 
             2 -> tasks.filter {
-                it.important && !it.completed
+                it.important &&
+                    !it.completed
             }
 
             3 -> tasks.filter {
@@ -257,27 +315,31 @@ private fun TaskendaScreen() {
 
             BottomAppBar(
 
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(
-                        start = 14.dp,
-                        end = 14.dp,
-                        bottom = 8.dp
-                    )
-                    .clip(
-                        RoundedCornerShape(28.dp)
-                    ),
+                modifier =
+                    Modifier
+                        .navigationBarsPadding()
+                        .padding(
+                            start = 14.dp,
+                            end = 14.dp,
+                            bottom = 8.dp
+                        ),
 
                 containerColor =
                     MaterialTheme.colorScheme.surfaceContainerHigh,
 
-                tonalElevation = 3.dp
+                tonalElevation = 3.dp,
+
+                contentPadding =
+                    PaddingValues(
+                        horizontal = 4.dp
+                    )
 
             ) {
 
                 NavigationBarItem(
 
-                    selected = selectedTab == 0,
+                    selected =
+                        selectedTab == 0,
 
                     onClick = {
 
@@ -292,6 +354,7 @@ private fun TaskendaScreen() {
                     },
 
                     icon = {
+
                         Icon(
                             Icons.Rounded.Home,
                             contentDescription = "Inicio"
@@ -305,7 +368,8 @@ private fun TaskendaScreen() {
 
                 NavigationBarItem(
 
-                    selected = selectedTab == 1,
+                    selected =
+                        selectedTab == 1,
 
                     onClick = {
 
@@ -320,6 +384,7 @@ private fun TaskendaScreen() {
                     },
 
                     icon = {
+
                         Icon(
                             Icons.Rounded.Upcoming,
                             contentDescription = "Pendientes"
@@ -332,12 +397,14 @@ private fun TaskendaScreen() {
                 )
 
                 Spacer(
-                    modifier = Modifier.width(64.dp)
+                    modifier =
+                        Modifier.width(64.dp)
                 )
 
                 NavigationBarItem(
 
-                    selected = selectedTab == 2,
+                    selected =
+                        selectedTab == 2,
 
                     onClick = {
 
@@ -352,6 +419,7 @@ private fun TaskendaScreen() {
                     },
 
                     icon = {
+
                         Icon(
                             Icons.Rounded.Star,
                             contentDescription = "Importantes"
@@ -365,7 +433,8 @@ private fun TaskendaScreen() {
 
                 NavigationBarItem(
 
-                    selected = selectedTab == 3,
+                    selected =
+                        selectedTab == 3,
 
                     onClick = {
 
@@ -380,6 +449,7 @@ private fun TaskendaScreen() {
                     },
 
                     icon = {
+
                         Icon(
                             Icons.Rounded.Check,
                             contentDescription = "Completadas"
@@ -404,10 +474,12 @@ private fun TaskendaScreen() {
                     )
 
                     editingTask = null
+
                     showAddSheet = true
                 },
 
-                shape = RoundedCornerShape(20.dp),
+                shape =
+                    RoundedCornerShape(20.dp),
 
                 containerColor =
                     MaterialTheme.colorScheme.primaryContainer,
@@ -419,7 +491,8 @@ private fun TaskendaScreen() {
 
                 Icon(
                     Icons.Rounded.Add,
-                    contentDescription = "Añadir tarea"
+                    contentDescription =
+                        "Añadir tarea"
                 )
             }
         }
@@ -428,14 +501,16 @@ private fun TaskendaScreen() {
 
         Column(
 
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(
-                    start = 18.dp,
-                    end = 18.dp,
-                    top = 18.dp
-                )
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = 18.dp
+                    )
+
         ) {
 
             TaskendaHeader(
@@ -444,7 +519,8 @@ private fun TaskendaScreen() {
             )
 
             Spacer(
-                modifier = Modifier.height(18.dp)
+                modifier =
+                    Modifier.height(18.dp)
             )
 
             if (visibleTasks.isEmpty()) {
@@ -457,7 +533,8 @@ private fun TaskendaScreen() {
 
                 LazyColumn(
 
-                    modifier = Modifier.fillMaxSize(),
+                    modifier =
+                        Modifier.fillMaxSize(),
 
                     contentPadding =
                         PaddingValues(
@@ -465,7 +542,9 @@ private fun TaskendaScreen() {
                         ),
 
                     verticalArrangement =
-                        Arrangement.spacedBy(10.dp)
+                        Arrangement.spacedBy(
+                            10.dp
+                        )
 
                 ) {
 
@@ -527,6 +606,7 @@ private fun TaskendaScreen() {
                             onEdit = {
 
                                 editingTask = task
+
                                 showAddSheet = true
                             },
 
@@ -550,14 +630,15 @@ private fun TaskendaScreen() {
             onDismiss = {
 
                 showAddSheet = false
+
                 editingTask = null
             },
 
             onSave = {
-                    title,
-                    notes,
-                    important,
-                    dueDate ->
+                title,
+                notes,
+                important,
+                dueDate ->
 
                 if (editingTask == null) {
 
@@ -574,7 +655,8 @@ private fun TaskendaScreen() {
 
                     val index =
                         tasks.indexOfFirst {
-                            it.id == editingTask!!.id
+                            it.id ==
+                                editingTask!!.id
                         }
 
                     if (index >= 0) {
@@ -596,6 +678,7 @@ private fun TaskendaScreen() {
                 )
 
                 showAddSheet = false
+
                 editingTask = null
             }
         )
@@ -626,7 +709,8 @@ private fun TaskendaScreen() {
                     onClick = {
 
                         tasks.removeAll {
-                            it.id == taskToDelete!!.id
+                            it.id ==
+                                taskToDelete!!.id
                         }
 
                         persist()
@@ -646,9 +730,11 @@ private fun TaskendaScreen() {
             dismissButton = {
 
                 TextButton(
+
                     onClick = {
                         taskToDelete = null
                     }
+
                 ) {
                     Text("Cancelar")
                 }
@@ -687,7 +773,8 @@ private fun TaskendaHeader(
 
     Row(
 
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier.fillMaxWidth(),
 
         verticalAlignment =
             Alignment.CenterVertically
@@ -695,7 +782,8 @@ private fun TaskendaHeader(
     ) {
 
         Column(
-            modifier = Modifier.weight(1f)
+            modifier =
+                Modifier.weight(1f)
         ) {
 
             Text(
@@ -710,7 +798,8 @@ private fun TaskendaHeader(
             )
 
             Spacer(
-                modifier = Modifier.height(2.dp)
+                modifier =
+                    Modifier.height(2.dp)
             )
 
             Text(
@@ -727,9 +816,11 @@ private fun TaskendaHeader(
 
         Surface(
 
-            modifier = Modifier.size(48.dp),
+            modifier =
+                Modifier.size(48.dp),
 
-            shape = CircleShape,
+            shape =
+                CircleShape,
 
             color =
                 MaterialTheme.colorScheme.primaryContainer
@@ -737,7 +828,8 @@ private fun TaskendaHeader(
         ) {
 
             Box(
-                contentAlignment = Alignment.Center
+                contentAlignment =
+                    Alignment.Center
             ) {
 
                 Icon(
@@ -784,7 +876,8 @@ private fun EmptyTasks(
 
     Box(
 
-        modifier = Modifier.fillMaxSize(),
+        modifier =
+            Modifier.fillMaxSize(),
 
         contentAlignment =
             Alignment.Center
@@ -806,7 +899,8 @@ private fun EmptyTasks(
                 modifier =
                     Modifier.size(84.dp),
 
-                shape = CircleShape,
+                shape =
+                    CircleShape,
 
                 color =
                     MaterialTheme.colorScheme.surfaceContainerHigh
@@ -844,7 +938,8 @@ private fun EmptyTasks(
             }
 
             Spacer(
-                modifier = Modifier.height(18.dp)
+                modifier =
+                    Modifier.height(18.dp)
             )
 
             Text(
@@ -859,7 +954,8 @@ private fun EmptyTasks(
             )
 
             Spacer(
-                modifier = Modifier.height(6.dp)
+                modifier =
+                    Modifier.height(6.dp)
             )
 
             Text(
@@ -918,11 +1014,12 @@ private fun TaskRow(
 
     Card(
 
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                onClick = onEdit
-            ),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClick = onEdit
+                ),
 
         shape =
             RoundedCornerShape(22.dp),
@@ -942,14 +1039,15 @@ private fun TaskRow(
 
         Row(
 
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = 8.dp,
-                    end = 8.dp,
-                    top = 10.dp,
-                    bottom = 10.dp
-                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 8.dp,
+                        end = 8.dp,
+                        top = 10.dp,
+                        bottom = 10.dp
+                    ),
 
             verticalAlignment =
                 Alignment.CenterVertically
@@ -966,11 +1064,13 @@ private fun TaskRow(
             )
 
             Spacer(
-                modifier = Modifier.width(10.dp)
+                modifier =
+                    Modifier.width(10.dp)
             )
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier =
+                    Modifier.weight(1f)
             ) {
 
                 Text(
@@ -1072,7 +1172,8 @@ private fun TaskRow(
             }
 
             IconButton(
-                onClick = onImportant
+                onClick =
+                    onImportant
             ) {
 
                 Icon(
@@ -1106,7 +1207,9 @@ private fun TaskRow(
                 IconButton(
 
                     onClick = {
-                        menuVisible = !menuVisible
+
+                        menuVisible =
+                            !menuVisible
                     }
 
                 ) {
@@ -1120,18 +1223,19 @@ private fun TaskRow(
                     )
                 }
 
-                androidx.compose.material3.DropdownMenu(
+                DropdownMenu(
 
                     expanded =
                         menuVisible,
 
                     onDismissRequest = {
+
                         menuVisible = false
                     }
 
                 ) {
 
-                    androidx.compose.material3.DropdownMenuItem(
+                    DropdownMenuItem(
 
                         text = {
                             Text("Editar")
@@ -1148,11 +1252,12 @@ private fun TaskRow(
                         onClick = {
 
                             menuVisible = false
+
                             onEdit()
                         }
                     )
 
-                    androidx.compose.material3.DropdownMenuItem(
+                    DropdownMenuItem(
 
                         text = {
                             Text("Eliminar")
@@ -1169,6 +1274,7 @@ private fun TaskRow(
                         onClick = {
 
                             menuVisible = false
+
                             onDelete()
                         }
                     )
@@ -1227,12 +1333,14 @@ private fun TaskCheckbox(
                     onClick = onClick
                 ),
 
-        shape = CircleShape,
+        shape =
+            CircleShape,
 
-        color = background,
+        color =
+            background,
 
         border =
-            androidx.compose.foundation.BorderStroke(
+            BorderStroke(
 
                 width =
                     if (checked) {
@@ -1254,7 +1362,8 @@ private fun TaskCheckbox(
 
             AnimatedVisibility(
 
-                visible = checked,
+                visible =
+                    checked,
 
                 enter =
                     fadeIn() + scaleIn(),
@@ -1369,8 +1478,11 @@ private fun TaskEditorSheet(
 
                 text =
                     if (task == null) {
+
                         "Nueva tarea"
+
                     } else {
+
                         "Editar tarea"
                     },
 
@@ -1388,7 +1500,8 @@ private fun TaskEditorSheet(
 
             OutlinedTextField(
 
-                value = title,
+                value =
+                    title,
 
                 onValueChange = {
                     title = it
@@ -1422,7 +1535,8 @@ private fun TaskEditorSheet(
 
             OutlinedTextField(
 
-                value = notes,
+                value =
+                    notes,
 
                 onValueChange = {
                     notes = it
@@ -1450,7 +1564,8 @@ private fun TaskEditorSheet(
 
             OutlinedTextField(
 
-                value = dueDate,
+                value =
+                    dueDate,
 
                 onValueChange = {
                     dueDate = it
@@ -1488,7 +1603,8 @@ private fun TaskEditorSheet(
                     Modifier
                         .fillMaxWidth()
                         .clickable {
-                            important = !important
+                            important =
+                                !important
                         },
 
                 shape =
@@ -1546,7 +1662,7 @@ private fun TaskEditorSheet(
                             Modifier.weight(1f)
                     )
 
-                    androidx.compose.material3.Switch(
+                    Switch(
 
                         checked =
                             important,
@@ -1570,7 +1686,9 @@ private fun TaskEditorSheet(
                     val cleanTitle =
                         title.trim()
 
-                    if (cleanTitle.isNotEmpty()) {
+                    if (
+                        cleanTitle.isNotEmpty()
+                    ) {
 
                         onSave(
 
