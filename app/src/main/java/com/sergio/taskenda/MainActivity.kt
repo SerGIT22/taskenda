@@ -15,7 +15,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +66,6 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -76,7 +74,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -177,15 +175,16 @@ private fun TaskendaApp() {
     val context = LocalContext.current
     val darkTheme = isSystemInDarkTheme()
 
-    val colors = if (android.os.Build.VERSION.SDK_INT >= 31) {
-        if (darkTheme) {
-            dynamicDarkColorScheme(context)
+    val colors =
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            if (darkTheme) {
+                dynamicDarkColorScheme(context)
+            } else {
+                dynamicLightColorScheme(context)
+            }
         } else {
-            dynamicLightColorScheme(context)
+            MaterialTheme.colorScheme
         }
-    } else {
-        MaterialTheme.colorScheme
-    }
 
     MaterialTheme(
         colorScheme = colors
@@ -203,7 +202,9 @@ private fun TaskendaScreen() {
 
     val tasks = remember {
         mutableStateListOf<Task>().apply {
-            addAll(TaskStorage.load(context))
+            addAll(
+                TaskStorage.load(context)
+            )
         }
     }
 
@@ -230,30 +231,32 @@ private fun TaskendaScreen() {
         )
     }
 
-    val visibleTasks = when (selectedTab) {
+    val visibleTasks =
+        when (selectedTab) {
 
-        1 -> tasks.filter {
-            !it.completed
-        }
+            1 -> tasks.filter {
+                !it.completed
+            }
 
-        2 -> tasks.filter {
-            it.important && !it.completed
-        }
+            2 -> tasks.filter {
+                it.important && !it.completed
+            }
 
-        3 -> tasks.filter {
-            it.completed
-        }
+            3 -> tasks.filter {
+                it.completed
+            }
 
-        else -> tasks.filter {
-            !it.completed
+            else -> tasks.filter {
+                !it.completed
+            }
         }
-    }
 
     Scaffold(
 
         bottomBar = {
 
             BottomAppBar(
+
                 modifier = Modifier
                     .navigationBarsPadding()
                     .padding(
@@ -264,48 +267,65 @@ private fun TaskendaScreen() {
                     .clip(
                         RoundedCornerShape(28.dp)
                     ),
+
                 containerColor =
                     MaterialTheme.colorScheme.surfaceContainerHigh,
+
                 tonalElevation = 3.dp
+
             ) {
 
                 NavigationBarItem(
+
                     selected = selectedTab == 0,
+
                     onClick = {
+
                         if (selectedTab != 0) {
+
                             haptic.performHapticFeedback(
                                 HapticFeedbackType.VirtualKey
                             )
+
                             selectedTab = 0
                         }
                     },
+
                     icon = {
                         Icon(
                             Icons.Rounded.Home,
                             contentDescription = "Inicio"
                         )
                     },
+
                     label = {
                         Text("Inicio")
                     }
                 )
 
                 NavigationBarItem(
+
                     selected = selectedTab == 1,
+
                     onClick = {
+
                         if (selectedTab != 1) {
+
                             haptic.performHapticFeedback(
                                 HapticFeedbackType.VirtualKey
                             )
+
                             selectedTab = 1
                         }
                     },
+
                     icon = {
                         Icon(
                             Icons.Rounded.Upcoming,
                             contentDescription = "Pendientes"
                         )
                     },
+
                     label = {
                         Text("Pendientes")
                     }
@@ -316,42 +336,56 @@ private fun TaskendaScreen() {
                 )
 
                 NavigationBarItem(
+
                     selected = selectedTab == 2,
+
                     onClick = {
+
                         if (selectedTab != 2) {
+
                             haptic.performHapticFeedback(
                                 HapticFeedbackType.VirtualKey
                             )
+
                             selectedTab = 2
                         }
                     },
+
                     icon = {
                         Icon(
                             Icons.Rounded.Star,
                             contentDescription = "Importantes"
                         )
                     },
+
                     label = {
                         Text("Importantes")
                     }
                 )
 
                 NavigationBarItem(
+
                     selected = selectedTab == 3,
+
                     onClick = {
+
                         if (selectedTab != 3) {
+
                             haptic.performHapticFeedback(
                                 HapticFeedbackType.VirtualKey
                             )
+
                             selectedTab = 3
                         }
                     },
+
                     icon = {
                         Icon(
                             Icons.Rounded.Check,
                             contentDescription = "Completadas"
                         )
                     },
+
                     label = {
                         Text("Hechas")
                     }
@@ -362,7 +396,9 @@ private fun TaskendaScreen() {
         floatingActionButton = {
 
             FloatingActionButton(
+
                 onClick = {
+
                     haptic.performHapticFeedback(
                         HapticFeedbackType.Confirm
                     )
@@ -370,11 +406,15 @@ private fun TaskendaScreen() {
                     editingTask = null
                     showAddSheet = true
                 },
+
                 shape = RoundedCornerShape(20.dp),
+
                 containerColor =
                     MaterialTheme.colorScheme.primaryContainer,
+
                 contentColor =
                     MaterialTheme.colorScheme.onPrimaryContainer
+
             ) {
 
                 Icon(
@@ -387,6 +427,7 @@ private fun TaskendaScreen() {
     ) { padding ->
 
         Column(
+
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -415,22 +456,26 @@ private fun TaskendaScreen() {
             } else {
 
                 LazyColumn(
+
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        bottom = 110.dp
-                    ),
+
+                    contentPadding =
+                        PaddingValues(
+                            bottom = 110.dp
+                        ),
+
                     verticalArrangement =
                         Arrangement.spacedBy(10.dp)
+
                 ) {
 
                     items(
                         items = visibleTasks,
-                        key = {
-                            it.id
-                        }
+                        key = { it.id }
                     ) { task ->
 
                         TaskRow(
+
                             task = task,
 
                             onToggle = {
@@ -480,11 +525,13 @@ private fun TaskendaScreen() {
                             },
 
                             onEdit = {
+
                                 editingTask = task
                                 showAddSheet = true
                             },
 
                             onDelete = {
+
                                 taskToDelete = task
                             }
                         )
@@ -497,14 +544,20 @@ private fun TaskendaScreen() {
     if (showAddSheet) {
 
         TaskEditorSheet(
+
             task = editingTask,
 
             onDismiss = {
+
                 showAddSheet = false
                 editingTask = null
             },
 
-            onSave = { title, notes, important, dueDate ->
+            onSave = {
+                    title,
+                    notes,
+                    important,
+                    dueDate ->
 
                 if (editingTask == null) {
 
@@ -551,6 +604,7 @@ private fun TaskendaScreen() {
     if (taskToDelete != null) {
 
         AlertDialog(
+
             onDismissRequest = {
                 taskToDelete = null
             },
@@ -568,6 +622,7 @@ private fun TaskendaScreen() {
             confirmButton = {
 
                 TextButton(
+
                     onClick = {
 
                         tasks.removeAll {
@@ -582,6 +637,7 @@ private fun TaskendaScreen() {
 
                         taskToDelete = null
                     }
+
                 ) {
                     Text("Eliminar")
                 }
@@ -607,22 +663,35 @@ private fun TaskendaHeader(
     taskCount: Int
 ) {
 
-    val title = when (selectedTab) {
-        1 -> "Pendientes"
-        2 -> "Importantes"
-        3 -> "Completadas"
-        else -> "Mis tareas"
-    }
+    val title =
+        when (selectedTab) {
 
-    val subtitle = when (taskCount) {
-        0 -> "Todo al día"
-        1 -> "1 tarea"
-        else -> "$taskCount tareas"
-    }
+            1 -> "Pendientes"
+
+            2 -> "Importantes"
+
+            3 -> "Completadas"
+
+            else -> "Mis tareas"
+        }
+
+    val subtitle =
+        when (taskCount) {
+
+            0 -> "Todo al día"
+
+            1 -> "1 tarea"
+
+            else -> "$taskCount tareas"
+        }
 
     Row(
+
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+
+        verticalAlignment =
+            Alignment.CenterVertically
+
     ) {
 
         Column(
@@ -630,9 +699,14 @@ private fun TaskendaHeader(
         ) {
 
             Text(
+
                 text = title,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold
+
+                style =
+                    MaterialTheme.typography.headlineLarge,
+
+                fontWeight =
+                    FontWeight.Bold
             )
 
             Spacer(
@@ -640,16 +714,26 @@ private fun TaskendaHeader(
             )
 
             Text(
+
                 text = subtitle,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                style =
+                    MaterialTheme.typography.bodyLarge,
+
+                color =
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         Surface(
+
             modifier = Modifier.size(48.dp),
+
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer
+
+            color =
+                MaterialTheme.colorScheme.primaryContainer
+
         ) {
 
             Box(
@@ -657,8 +741,11 @@ private fun TaskendaHeader(
             ) {
 
                 Icon(
+
                     Icons.Rounded.TaskAlt,
+
                     contentDescription = null,
+
                     tint =
                         MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -672,50 +759,86 @@ private fun EmptyTasks(
     selectedTab: Int
 ) {
 
-    val title = when (selectedTab) {
-        2 -> "Nada importante"
-        3 -> "Aún no hay tareas hechas"
-        else -> "No tienes tareas"
-    }
+    val title =
+        when (selectedTab) {
 
-    val subtitle = when (selectedTab) {
-        2 ->
-            "Marca una tarea como importante para verla aquí."
-        3 ->
-            "Las tareas completadas aparecerán aquí."
-        else ->
-            "Pulsa el botón + para crear tu primera tarea."
-    }
+            2 -> "Nada importante"
+
+            3 -> "Aún no hay tareas hechas"
+
+            else -> "No tienes tareas"
+        }
+
+    val subtitle =
+        when (selectedTab) {
+
+            2 ->
+                "Marca una tarea como importante para verla aquí."
+
+            3 ->
+                "Las tareas completadas aparecerán aquí."
+
+            else ->
+                "Pulsa el botón + para crear tu primera tarea."
+        }
 
     Box(
+
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+
+        contentAlignment =
+            Alignment.Center
+
     ) {
 
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
+
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+
+            modifier =
+                Modifier.padding(32.dp)
+
         ) {
 
             Surface(
-                modifier = Modifier.size(84.dp),
+
+                modifier =
+                    Modifier.size(84.dp),
+
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
+
+                color =
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+
             ) {
 
                 Box(
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Icon(
+
                         when (selectedTab) {
-                            2 -> Icons.Rounded.Star
-                            3 -> Icons.Rounded.Check
-                            else -> Icons.Rounded.TaskAlt
+
+                            2 ->
+                                Icons.Rounded.Star
+
+                            3 ->
+                                Icons.Rounded.Check
+
+                            else ->
+                                Icons.Rounded.TaskAlt
                         },
+
                         contentDescription = null,
-                        modifier = Modifier.size(38.dp),
-                        tint = MaterialTheme.colorScheme.primary
+
+                        modifier =
+                            Modifier.size(38.dp),
+
+                        tint =
+                            MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -725,9 +848,14 @@ private fun EmptyTasks(
             )
 
             Text(
+
                 title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+
+                style =
+                    MaterialTheme.typography.titleLarge,
+
+                fontWeight =
+                    FontWeight.Bold
             )
 
             Spacer(
@@ -735,9 +863,14 @@ private fun EmptyTasks(
             )
 
             Text(
+
                 subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                style =
+                    MaterialTheme.typography.bodyMedium,
+
+                color =
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -745,23 +878,37 @@ private fun EmptyTasks(
 
 @Composable
 private fun TaskRow(
+
     task: Task,
+
     onToggle: () -> Unit,
+
     onImportant: () -> Unit,
+
     onEdit: () -> Unit,
+
     onDelete: () -> Unit
+
 ) {
 
     val containerColor by animateColorAsState(
+
         targetValue =
             if (task.completed) {
+
                 MaterialTheme.colorScheme.surfaceContainerLow
+
             } else {
+
                 MaterialTheme.colorScheme.surfaceContainer
             },
-        animationSpec = spring(
-            stiffness = Spring.StiffnessMediumLow
-        ),
+
+        animationSpec =
+            spring(
+                stiffness =
+                    Spring.StiffnessMediumLow
+            ),
+
         label = "taskContainer"
     )
 
@@ -770,25 +917,31 @@ private fun TaskRow(
     }
 
     Card(
+
         modifier = Modifier
             .fillMaxWidth()
-            .animateItem()
             .clickable(
                 onClick = onEdit
             ),
 
-        shape = RoundedCornerShape(22.dp),
+        shape =
+            RoundedCornerShape(22.dp),
 
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    containerColor
+            ),
 
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp
-        )
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 0.dp
+            )
+
     ) {
 
         Row(
+
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
@@ -797,12 +950,19 @@ private fun TaskRow(
                     top = 10.dp,
                     bottom = 10.dp
                 ),
-            verticalAlignment = Alignment.CenterVertically
+
+            verticalAlignment =
+                Alignment.CenterVertically
+
         ) {
 
             TaskCheckbox(
-                checked = task.completed,
-                onClick = onToggle
+
+                checked =
+                    task.completed,
+
+                onClick =
+                    onToggle
             )
 
             Spacer(
@@ -814,19 +974,33 @@ private fun TaskRow(
             ) {
 
                 Text(
-                    text = task.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+
+                    text =
+                        task.title,
+
+                    style =
+                        MaterialTheme.typography.bodyLarge,
+
+                    fontWeight =
+                        FontWeight.Medium,
+
                     textDecoration =
                         if (task.completed) {
+
                             TextDecoration.LineThrough
+
                         } else {
+
                             TextDecoration.None
                         },
+
                     color =
                         if (task.completed) {
+
                             MaterialTheme.colorScheme.onSurfaceVariant
+
                         } else {
+
                             MaterialTheme.colorScheme.onSurface
                         }
                 )
@@ -834,13 +1008,20 @@ private fun TaskRow(
                 if (task.notes.isNotBlank()) {
 
                     Spacer(
-                        modifier = Modifier.height(3.dp)
+                        modifier =
+                            Modifier.height(3.dp)
                     )
 
                     Text(
-                        text = task.notes,
+
+                        text =
+                            task.notes,
+
                         maxLines = 2,
-                        style = MaterialTheme.typography.bodySmall,
+
+                        style =
+                            MaterialTheme.typography.bodySmall,
+
                         color =
                             MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -849,7 +1030,8 @@ private fun TaskRow(
                 if (task.dueDate.isNotBlank()) {
 
                     Spacer(
-                        modifier = Modifier.height(5.dp)
+                        modifier =
+                            Modifier.height(5.dp)
                     )
 
                     Row(
@@ -858,21 +1040,30 @@ private fun TaskRow(
                     ) {
 
                         Icon(
+
                             Icons.Rounded.Today,
+
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp),
+
+                            modifier =
+                                Modifier.size(15.dp),
+
                             tint =
                                 MaterialTheme.colorScheme.primary
                         )
 
                         Spacer(
-                            modifier = Modifier.width(4.dp)
+                            modifier =
+                                Modifier.width(4.dp)
                         )
 
                         Text(
+
                             task.dueDate,
+
                             style =
                                 MaterialTheme.typography.labelMedium,
+
                             color =
                                 MaterialTheme.colorScheme.primary
                         )
@@ -885,17 +1076,26 @@ private fun TaskRow(
             ) {
 
                 Icon(
+
                     Icons.Rounded.Star,
+
                     contentDescription =
                         if (task.important) {
+
                             "Quitar de importantes"
+
                         } else {
+
                             "Marcar como importante"
                         },
+
                     tint =
                         if (task.important) {
+
                             MaterialTheme.colorScheme.primary
+
                         } else {
+
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
                 )
@@ -904,51 +1104,70 @@ private fun TaskRow(
             Box {
 
                 IconButton(
+
                     onClick = {
                         menuVisible = !menuVisible
                     }
+
                 ) {
 
                     Icon(
+
                         Icons.Rounded.MoreVert,
-                        contentDescription = "Más opciones"
+
+                        contentDescription =
+                            "Más opciones"
                     )
                 }
 
                 androidx.compose.material3.DropdownMenu(
-                    expanded = menuVisible,
+
+                    expanded =
+                        menuVisible,
+
                     onDismissRequest = {
                         menuVisible = false
                     }
+
                 ) {
 
                     androidx.compose.material3.DropdownMenuItem(
+
                         text = {
                             Text("Editar")
                         },
+
                         leadingIcon = {
+
                             Icon(
                                 Icons.Rounded.Edit,
                                 contentDescription = null
                             )
                         },
+
                         onClick = {
+
                             menuVisible = false
                             onEdit()
                         }
                     )
 
                     androidx.compose.material3.DropdownMenuItem(
+
                         text = {
                             Text("Eliminar")
                         },
+
                         leadingIcon = {
+
                             Icon(
                                 Icons.Rounded.Delete,
                                 contentDescription = null
                             )
                         },
+
                         onClick = {
+
                             menuVisible = false
                             onDelete()
                         }
@@ -961,60 +1180,99 @@ private fun TaskRow(
 
 @Composable
 private fun TaskCheckbox(
+
     checked: Boolean,
+
     onClick: () -> Unit
+
 ) {
 
     val background by animateColorAsState(
+
         targetValue =
             if (checked) {
+
                 MaterialTheme.colorScheme.primary
+
             } else {
+
                 Color.Transparent
             },
-        animationSpec = spring(
-            stiffness = Spring.StiffnessMedium
-        ),
+
+        animationSpec =
+            spring(
+                stiffness =
+                    Spring.StiffnessMedium
+            ),
+
         label = "checkboxBackground"
     )
 
     val borderColor =
         if (checked) {
+
             MaterialTheme.colorScheme.primary
+
         } else {
+
             MaterialTheme.colorScheme.outline
         }
 
     Surface(
-        modifier = Modifier
-            .size(46.dp)
-            .clickable(
-                onClick = onClick
-            ),
+
+        modifier =
+            Modifier
+                .size(46.dp)
+                .clickable(
+                    onClick = onClick
+                ),
+
         shape = CircleShape,
+
         color = background,
-        border = androidx.compose.foundation.BorderStroke(
-            width = if (checked) 0.dp else 2.dp,
-            color = borderColor
-        )
+
+        border =
+            androidx.compose.foundation.BorderStroke(
+
+                width =
+                    if (checked) {
+                        0.dp
+                    } else {
+                        2.dp
+                    },
+
+                color =
+                    borderColor
+            )
+
     ) {
 
         Box(
-            contentAlignment = Alignment.Center
+            contentAlignment =
+                Alignment.Center
         ) {
 
             AnimatedVisibility(
+
                 visible = checked,
+
                 enter =
                     fadeIn() + scaleIn(),
+
                 exit =
                     fadeOut() + scaleOut()
+
             ) {
 
                 Icon(
+
                     Icons.Rounded.Check,
+
                     contentDescription = null,
-                    modifier = Modifier.size(25.dp),
+
+                    modifier =
+                        Modifier.size(25.dp),
+
                     tint =
                         MaterialTheme.colorScheme.onPrimary
                 )
@@ -1026,14 +1284,18 @@ private fun TaskCheckbox(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskEditorSheet(
+
     task: Task?,
+
     onDismiss: () -> Unit,
+
     onSave: (
         title: String,
         notes: String,
         important: Boolean,
         dueDate: String
     ) -> Unit
+
 ) {
 
     val sheetState =
@@ -1042,19 +1304,30 @@ private fun TaskEditorSheet(
         )
 
     var title by remember(task?.id) {
-        mutableStateOf(task?.title ?: "")
+
+        mutableStateOf(
+            task?.title ?: ""
+        )
     }
 
     var notes by remember(task?.id) {
-        mutableStateOf(task?.notes ?: "")
+
+        mutableStateOf(
+            task?.notes ?: ""
+        )
     }
 
     var important by remember(task?.id) {
-        mutableStateOf(task?.important ?: false)
+
+        mutableStateOf(
+            task?.important ?: false
+        )
     }
 
     var dueDate by remember(task?.id) {
+
         mutableStateOf(
+
             task?.dueDate
                 ?: SimpleDateFormat(
                     "dd/MM/yyyy",
@@ -1064,146 +1337,220 @@ private fun TaskEditorSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(
-            topStart = 30.dp,
-            topEnd = 30.dp
-        )
+
+        onDismissRequest =
+            onDismiss,
+
+        sheetState =
+            sheetState,
+
+        shape =
+            RoundedCornerShape(
+                topStart = 30.dp,
+                topEnd = 30.dp
+            )
+
     ) {
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = 20.dp,
-                    end = 20.dp,
-                    bottom = 28.dp
-                )
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = 28.dp
+                    )
+
         ) {
 
             Text(
+
                 text =
                     if (task == null) {
                         "Nueva tarea"
                     } else {
                         "Editar tarea"
                     },
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+
+                style =
+                    MaterialTheme.typography.headlineSmall,
+
+                fontWeight =
+                    FontWeight.Bold
             )
 
             Spacer(
-                modifier = Modifier.height(18.dp)
+                modifier =
+                    Modifier.height(18.dp)
             )
 
             OutlinedTextField(
+
                 value = title,
+
                 onValueChange = {
                     title = it
                 },
-                modifier = Modifier.fillMaxWidth(),
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
                 singleLine = true,
+
                 label = {
                     Text("Tarea")
                 },
+
                 leadingIcon = {
+
                     Icon(
                         Icons.Rounded.TaskAlt,
                         contentDescription = null
                     )
                 },
-                shape = RoundedCornerShape(18.dp)
+
+                shape =
+                    RoundedCornerShape(18.dp)
             )
 
             Spacer(
-                modifier = Modifier.height(12.dp)
+                modifier =
+                    Modifier.height(12.dp)
             )
 
             OutlinedTextField(
+
                 value = notes,
+
                 onValueChange = {
                     notes = it
                 },
-                modifier = Modifier.fillMaxWidth(),
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
                 minLines = 3,
+
                 maxLines = 5,
+
                 label = {
                     Text("Notas")
                 },
-                shape = RoundedCornerShape(18.dp)
+
+                shape =
+                    RoundedCornerShape(18.dp)
             )
 
             Spacer(
-                modifier = Modifier.height(12.dp)
+                modifier =
+                    Modifier.height(12.dp)
             )
 
             OutlinedTextField(
+
                 value = dueDate,
+
                 onValueChange = {
                     dueDate = it
                 },
-                modifier = Modifier.fillMaxWidth(),
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
                 singleLine = true,
+
                 label = {
                     Text("Fecha")
                 },
+
                 leadingIcon = {
+
                     Icon(
                         Icons.Rounded.Today,
                         contentDescription = null
                     )
                 },
-                shape = RoundedCornerShape(18.dp)
+
+                shape =
+                    RoundedCornerShape(18.dp)
             )
 
             Spacer(
-                modifier = Modifier.height(10.dp)
+                modifier =
+                    Modifier.height(10.dp)
             )
 
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        important = !important
-                    },
-                shape = RoundedCornerShape(18.dp),
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            important = !important
+                        },
+
+                shape =
+                    RoundedCornerShape(18.dp),
+
                 color =
                     if (important) {
+
                         MaterialTheme.colorScheme.primaryContainer
+
                     } else {
+
                         MaterialTheme.colorScheme.surfaceContainer
                     }
+
             ) {
 
                 Row(
-                    modifier = Modifier.padding(15.dp),
+
+                    modifier =
+                        Modifier.padding(15.dp),
+
                     verticalAlignment =
                         Alignment.CenterVertically
+
                 ) {
 
                     Icon(
+
                         Icons.Rounded.Star,
+
                         contentDescription = null,
+
                         tint =
                             if (important) {
+
                                 MaterialTheme.colorScheme.primary
+
                             } else {
+
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             }
                     )
 
                     Spacer(
-                        modifier = Modifier.width(12.dp)
+                        modifier =
+                            Modifier.width(12.dp)
                     )
 
                     Text(
+
                         "Marcar como importante",
-                        modifier = Modifier.weight(1f)
+
+                        modifier =
+                            Modifier.weight(1f)
                     )
 
                     androidx.compose.material3.Switch(
-                        checked = important,
+
+                        checked =
+                            important,
+
                         onCheckedChange = {
                             important = it
                         }
@@ -1212,41 +1559,62 @@ private fun TaskEditorSheet(
             }
 
             Spacer(
-                modifier = Modifier.height(18.dp)
+                modifier =
+                    Modifier.height(18.dp)
             )
 
             Button(
+
                 onClick = {
-                    val cleanTitle = title.trim()
+
+                    val cleanTitle =
+                        title.trim()
 
                     if (cleanTitle.isNotEmpty()) {
+
                         onSave(
+
                             cleanTitle,
+
                             notes.trim(),
+
                             important,
+
                             dueDate.trim()
                         )
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                shape = RoundedCornerShape(18.dp)
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+
+                shape =
+                    RoundedCornerShape(18.dp)
+
             ) {
 
                 Icon(
+
                     Icons.Rounded.Check,
+
                     contentDescription = null
                 )
 
                 Spacer(
-                    modifier = Modifier.width(8.dp)
+                    modifier =
+                        Modifier.width(8.dp)
                 )
 
                 Text(
+
                     if (task == null) {
+
                         "Crear tarea"
+
                     } else {
+
                         "Guardar cambios"
                     }
                 )
