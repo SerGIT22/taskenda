@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sergio.taskenda.data.Task
 import com.sergio.taskenda.data.TaskRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -24,13 +25,16 @@ class TaskViewModel(
         important: Boolean = false,
         dueDate: Long? = null
     ) {
-        if (title.isBlank()) return
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank()) return
 
-        viewModelScope.launch {
+        val cleanNotes = notes.trim()
+
+        viewModelScope.launch(Dispatchers.IO) {
             repository.add(
                 Task(
-                    title = title.trim(),
-                    notes = notes.trim(),
+                    title = cleanTitle,
+                    notes = cleanNotes,
                     important = important,
                     dueDate = dueDate
                 )
@@ -39,7 +43,7 @@ class TaskViewModel(
     }
 
     fun toggle(task: Task) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.update(
                 task.copy(
                     completed = !task.completed
@@ -49,7 +53,7 @@ class TaskViewModel(
     }
 
     fun setImportant(task: Task) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.update(
                 task.copy(
                     important = !task.important
@@ -59,13 +63,13 @@ class TaskViewModel(
     }
 
     fun update(task: Task) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.update(task)
         }
     }
 
     fun delete(task: Task) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.delete(task)
         }
     }
