@@ -33,9 +33,22 @@ jobs:
         with:
           packages: 'platform-tools'
 
+      - name: Check Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo ""
+          echo "Plataformas instaladas:"
+          sdkmanager --list_installed | grep "platforms;" || true
+          echo ""
+          echo "Build tools instaladas:"
+          sdkmanager --list_installed | grep "build-tools;" || true
+
       - name: Install Android SDK packages
         run: |
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-37"
+          sdkmanager "build-tools;36.0.0"
 
       - name: Accept Android SDK licenses
         run: |
