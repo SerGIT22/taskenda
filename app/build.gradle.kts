@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
@@ -14,8 +13,6 @@ android {
         minSdk = 26
         targetSdk = 36
 
-        // En GitHub Actions aumenta automáticamente con cada ejecución.
-        // Si se compila fuera de GitHub, empieza en 2.
         versionCode = maxOf(
             2,
             System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
@@ -60,6 +57,7 @@ android {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.08.00")
+
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
@@ -72,6 +70,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
