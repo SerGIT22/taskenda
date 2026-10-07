@@ -29,4 +29,7 @@ interface TaskDao {
 
     @Delete
     suspend fun delete(task: Task)
+
+    @Query("UPDATE tasks SET listName = :toList WHERE listName = :fromList")
+    suspend fun moveTasksToList(fromList: String, toList: String)
 }
