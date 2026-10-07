@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -157,14 +156,23 @@ private fun TaskendaApp(vm: TaskViewModel) {
         mutableStateOf<Task?>(null)
     }
 
-    val visibleTasks = remember(tasks, selectedTab) {
-        when (selectedTab) {
-            0 -> tasks.filter { !it.completed }
-            1 -> tasks.filter { !it.completed }
-            2 -> tasks.filter { !it.completed && it.important }
-            3 -> tasks.filter { it.completed }
-            else -> emptyList()
-        }
+    // Calculamos cada grupo una sola vez cuando cambia la lista de tareas.
+    // Así evitamos recorrer toda la base de datos varias veces durante una creación.
+    val pendingTasks = remember(tasks) {
+        tasks.filter { !it.completed }
+    }
+    val completedTasks = remember(tasks) {
+        tasks.filter { it.completed }
+    }
+    val importantTasks = remember(tasks) {
+        tasks.filter { !it.completed && it.important }
+    }
+
+    val visibleTasks = when (selectedTab) {
+        0, 1 -> pendingTasks
+        2 -> importantTasks
+        3 -> completedTasks
+        else -> emptyList()
     }
 
     val headerTitle = when (selectedTab) {
@@ -184,10 +192,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
     }
 
     val headerCount = when (selectedTab) {
-        0 -> tasks.count { !it.completed }
-        1 -> tasks.count { !it.completed }
-        2 -> tasks.count { !it.completed && it.important }
-        3 -> tasks.count { it.completed }
+        0, 1 -> pendingTasks.size
+        2 -> importantTasks.size
+        3 -> completedTasks.size
         else -> 0
     }
 
@@ -252,10 +259,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         else -> ""
                     },
                     taskCount = when (tab) {
-                        0 -> tasks.count { !it.completed }
-                        1 -> tasks.count { !it.completed }
-                        2 -> tasks.count { !it.completed && it.important }
-                        3 -> tasks.count { it.completed }
+                        0, 1 -> pendingTasks.size
+                        2 -> importantTasks.size
+                        3 -> completedTasks.size
                         else -> 0
                     }
                 )
@@ -277,10 +283,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 ) { tab ->
 
                     val tabTasks = when (tab) {
-                        0 -> tasks.filter { !it.completed }
-                        1 -> tasks.filter { !it.completed }
-                        2 -> tasks.filter { !it.completed && it.important }
-                        3 -> tasks.filter { it.completed }
+                        0, 1 -> pendingTasks
+                        2 -> importantTasks
+                        3 -> completedTasks
                         else -> emptyList()
                     }
 
@@ -760,12 +765,6 @@ private fun TaskEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(
-                    animationSpec = tween(
-                        durationMillis = 220,
-                        easing = FastOutSlowInEasing
-                    )
-                )
                 .padding(
                     start = 20.dp,
                     end = 20.dp,
@@ -992,9 +991,9 @@ private fun TaskendaBottomBar(
                 icon = {
                     Icon(
                         imageVector = if (selectedTab == 0) {
-                            Icons.Default.CheckCircle
+                            Icons.Default.Event
                         } else {
-                            Icons.Outlined.CheckCircle
+                            Icons.Outlined.Event
                         },
                         contentDescription = "Hoy"
                     )
@@ -1011,11 +1010,7 @@ private fun TaskendaBottomBar(
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = if (selectedTab == 1) {
-                            Icons.Default.TaskAlt
-                        } else {
-                            Icons.Outlined.CheckCircle
-                        },
+                        imageVector = Icons.Default.TaskAlt,
                         contentDescription = "Tareas"
                     )
                 },
@@ -1052,9 +1047,9 @@ private fun TaskendaBottomBar(
                 icon = {
                     Icon(
                         imageVector = if (selectedTab == 3) {
-                            Icons.Default.Check
-                        } else {
                             Icons.Default.CheckCircle
+                        } else {
+                            Icons.Outlined.CheckCircle
                         },
                         contentDescription = "Completadas"
                     )
