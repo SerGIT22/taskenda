@@ -53,27 +53,33 @@ jobs:
       - name: Prepare persistent signing key
         env:
           TASKENDA_KEYSTORE_BASE64: ${{ secrets.TASKENDA_KEYSTORE_BASE64 }}
+          TASKENDA_KEYSTORE_PASSWORD: ${{ secrets.TASKENDA_KEYSTORE_PASSWORD }}
+          TASKENDA_KEY_ALIAS: ${{ secrets.TASKENDA_KEY_ALIAS }}
         run: |
           if [ -z "$TASKENDA_KEYSTORE_BASE64" ]; then
             echo "Falta el secret TASKENDA_KEYSTORE_BASE64"
             exit 1
           fi
 
+          echo "Decodificando keystore..."
+
           printf '%s' "$TASKENDA_KEYSTORE_BASE64" \
-            | tr -d '\r\n\t ' \
-            | base64 --decode > "$GITHUB_WORKSPACE/app/taskenda-debug.keystore"
+            | base64 --decode --ignore-garbage \
+            > "$GITHUB_WORKSPACE/app/taskenda-debug.keystore"
 
           if [ ! -s "$GITHUB_WORKSPACE/app/taskenda-debug.keystore" ]; then
-            echo "No se pudo crear el keystore"
+            echo "ERROR: El keystore generado está vacío."
             exit 1
           fi
+
+          echo "Keystore generado correctamente."
 
           echo "Comprobando keystore..."
 
           keytool -list \
             -keystore "$GITHUB_WORKSPACE/app/taskenda-debug.keystore" \
-            -storepass "${{ secrets.TASKENDA_KEYSTORE_PASSWORD }}" \
-            -alias "${{ secrets.TASKENDA_KEY_ALIAS }}" \
+            -storepass "$TASKENDA_KEYSTORE_PASSWORD" \
+            -alias "$TASKENDA_KEY_ALIAS" \
             > /dev/null
 
           echo "Keystore válido y alias correcto."
