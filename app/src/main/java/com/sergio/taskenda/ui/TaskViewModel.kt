@@ -107,10 +107,9 @@ class TaskViewModel(
     }
 
     fun toggle(task: Task) {
+        val newCompleted = !task.completed
         viewModelScope.launch(Dispatchers.IO) {
-            repository.update(
-                task.copy(completed = !task.completed)
-            )
+            repository.setCompleted(task.id, newCompleted)
         }
     }
 
