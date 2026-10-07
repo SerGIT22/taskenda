@@ -4,12 +4,22 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,27 +28,31 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material.icons.rounded.TaskAlt
-import androidx.compose.material.icons.rounded.Today
-import androidx.compose.material.icons.rounded.Upcoming
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -53,128 +67,185 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.graphicsLayer
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 
-
-private data class Task(
-    val id: String = UUID.randomUUID().toString(),
+data class Task(
+    val id: Long,
     val title: String,
     val notes: String = "",
     val completed: Boolean = false,
     val important: Boolean = false,
-    val dueDate: String = ""
+    val dueDate: Long? = null
 )
-
 
 private object TaskStorage {
 
-    private const val PREFS = "taskenda_preferences"
-    private const val TASKS = "tasks"
+    private const val PREFS_NAME = "taskenda_storage"
+    private const val TASKS_KEY = "tasks_json"
 
-    fun load(context: Context): List<Task> {
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(
+            PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+
+    fun loadTasks(context: Context): List<Task> {
+        val raw = prefs(context)
+            .getString(TASKS_KEY, null)
+
+        if (raw.isNullOrBlank()) {
+            return emptyList()
+        }
+
         return try {
-            val prefs = context.getSharedPreferences(
-                PREFS,
-                Context.MODE_PRIVATE
-            )
-
-            val raw = prefs.getString(
-                TASKS,
-                "[]"
-            ) ?: "[]"
-
             val array = JSONArray(raw)
+            val result = mutableListOf<Task>()
 
-            buildList {
-                for (i in 0 until array.length()) {
-                    val item = array.getJSONObject(i)
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i)
+                    ?: continue
 
-                    add(
-                        Task(
-                            id = item.optString("id")
-                                .ifBlank {
-                                    UUID.randomUUID().toString()
-                                },
-                            title = item.optString("title"),
-                            notes = item.optString("notes"),
-                            completed = item.optBoolean("completed"),
-                            important = item.optBoolean("important"),
-                            dueDate = item.optString("dueDate")
-                        )
-                    )
+                val id = item.optLong("id")
+                val title = item.optString("title")
+
+                if (title.isBlank()) {
+                    continue
                 }
+
+                val notes = item.optString(
+                    "notes",
+                    ""
+                )
+
+                val completed = item.optBoolean(
+                    "completed",
+                    false
+                )
+
+                val important = item.optBoolean(
+                    "important",
+                    false
+                )
+
+                val dueDate =
+                    if (
+                        item.has("dueDate") &&
+                        !item.isNull("dueDate")
+                    ) {
+                        item.optLong("dueDate")
+                            .takeIf { it > 0L }
+                    } else {
+                        null
+                    }
+
+                result.add(
+                    Task(
+                        id = id,
+                        title = title,
+                        notes = notes,
+                        completed = completed,
+                        important = important,
+                        dueDate = dueDate
+                    )
+                )
             }
+
+            result
         } catch (_: Exception) {
             emptyList()
         }
     }
 
-    fun save(
+    fun saveTasks(
         context: Context,
         tasks: List<Task>
     ) {
         val array = JSONArray()
 
         tasks.forEach { task ->
-            array.put(
-                JSONObject().apply {
-                    put("id", task.id)
-                    put("title", task.title)
-                    put("notes", task.notes)
-                    put("completed", task.completed)
-                    put("important", task.important)
-                    put("dueDate", task.dueDate)
+
+            val objectJson = JSONObject().apply {
+                put(
+                    "id",
+                    task.id
+                )
+
+                put(
+                    "title",
+                    task.title
+                )
+
+                put(
+                    "notes",
+                    task.notes
+                )
+
+                put(
+                    "completed",
+                    task.completed
+                )
+
+                put(
+                    "important",
+                    task.important
+                )
+
+                if (task.dueDate != null) {
+                    put(
+                        "dueDate",
+                        task.dueDate
+                    )
+                } else {
+                    put(
+                        "dueDate",
+                        JSONObject.NULL
+                    )
                 }
-            )
+            }
+
+            array.put(objectJson)
         }
 
-        context
-            .getSharedPreferences(
-                PREFS,
-                Context.MODE_PRIVATE
-            )
+        prefs(context)
             .edit()
             .putString(
-                TASKS,
+                TASKS_KEY,
                 array.toString()
             )
             .apply()
     }
 }
-
 
 class MainActivity : ComponentActivity() {
 
@@ -189,52 +260,45 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 private fun TaskendaApp() {
 
-    val context = LocalContext.current
-    val darkTheme = isSystemInDarkTheme()
-
-    val colors =
-        if (android.os.Build.VERSION.SDK_INT >= 31) {
-            if (darkTheme) {
-                dynamicDarkColorScheme(context)
-            } else {
-                dynamicLightColorScheme(context)
-            }
-        } else {
-            MaterialTheme.colorScheme
-        }
+    val isDark =
+        isSystemInDarkTheme()
 
     MaterialTheme(
-        colorScheme = colors
+        colorScheme =
+            if (isDark) {
+                darkColorScheme()
+            } else {
+                lightColorScheme()
+            }
     ) {
         TaskendaScreen()
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskendaScreen() {
 
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
+    val context =
+        LocalContext.current
 
-    val tasks = remember {
-        mutableStateListOf<Task>().apply {
-            addAll(
-                TaskStorage.load(context)
-            )
-        }
+    val haptic =
+        LocalHapticFeedback.current
+
+    var tasks by remember {
+        mutableStateOf(
+            TaskStorage.loadTasks(context)
+        )
     }
 
     var selectedTab by remember {
-        mutableIntStateOf(0)
+        mutableStateOf(0)
     }
 
-    var showEditor by remember {
+    var editorVisible by remember {
         mutableStateOf(false)
     }
 
@@ -242,66 +306,56 @@ private fun TaskendaScreen() {
         mutableStateOf<Task?>(null)
     }
 
-    var taskToDelete by remember {
-        mutableStateOf<Task?>(null)
-    }
+    fun saveTasks(
+        newTasks: List<Task>
+    ) {
+        tasks = newTasks
 
-    fun persist() {
-        TaskStorage.save(
+        TaskStorage.saveTasks(
             context,
-            tasks.toList()
+            newTasks
         )
     }
 
     val visibleTasks =
         when (selectedTab) {
+
+            0 -> tasks.filter {
+                !it.completed
+            }
+
             1 -> tasks.filter {
                 !it.completed
             }
 
             2 -> tasks.filter {
-                it.important && !it.completed
+                !it.completed &&
+                        it.important
             }
 
             3 -> tasks.filter {
                 it.completed
             }
 
-            else -> tasks.filter {
-                !it.completed
-            }
+            else -> tasks
         }
 
     Scaffold(
-        bottomBar = {
-            TaskendaBottomBar(
-                selectedTab = selectedTab,
-                onTabSelected = { tab ->
-                    if (tab != selectedTab) {
-                        haptic.performHapticFeedback(
-                            HapticFeedbackType.VirtualKey
-                        )
-
-                        selectedTab = tab
-                    }
-                }
-            )
-        },
+        containerColor =
+            MaterialTheme.colorScheme.background,
 
         floatingActionButton = {
+
             FloatingActionButton(
                 onClick = {
+
                     haptic.performHapticFeedback(
-                        HapticFeedbackType.Confirm
+                        HapticFeedbackType.LongPress
                     )
 
                     editingTask = null
-                    showEditor = true
+                    editorVisible = true
                 },
-
-                modifier = Modifier.size(56.dp),
-
-                shape = RoundedCornerShape(18.dp),
 
                 containerColor =
                     MaterialTheme.colorScheme.primaryContainer,
@@ -309,552 +363,515 @@ private fun TaskendaScreen() {
                 contentColor =
                     MaterialTheme.colorScheme.onPrimaryContainer
             ) {
+
                 Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "Añadir tarea",
-                    modifier = Modifier.size(27.dp)
+                    imageVector =
+                        Icons.Default.Add,
+
+                    contentDescription =
+                        "Añadir tarea"
                 )
             }
+        },
+
+        bottomBar = {
+
+            TaskendaBottomBar(
+                selectedTab = selectedTab,
+                onTabSelected = {
+                    selectedTab = it
+                }
+            )
         }
-    ) { padding ->
+
+    ) { paddingValues ->
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(
-                    start = 18.dp,
-                    end = 18.dp,
-                    top = 18.dp
-                )
+                .padding(paddingValues)
         ) {
 
-            TaskendaHeader(
-                selectedTab = selectedTab,
-                taskCount = visibleTasks.size
-            )
+            /*
+             * CABECERA ANIMADA
+             *
+             * La animamos por separado para que el cambio
+             * de categoría no reconstruya bruscamente toda
+             * la pantalla.
+             */
+            AnimatedContent(
+                targetState = selectedTab,
+                modifier = Modifier.fillMaxWidth(),
 
-            Spacer(
-                modifier = Modifier.height(18.dp)
-            )
+                transitionSpec = {
 
-            if (visibleTasks.isEmpty()) {
+                    (
+                        fadeIn(
+                            animationSpec =
+                                tween(
+                                    durationMillis = 180
+                                )
+                        ) +
+                            scaleIn(
+                                initialScale = 0.97f,
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 220,
+                                        easing =
+                                            FastOutSlowInEasing
+                                    )
+                            )
+                        ) togetherWith
+                        (
+                            fadeOut(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 120
+                                    )
+                            ) +
+                                scaleOut(
+                                    targetScale = 0.985f,
+                                    animationSpec =
+                                        tween(
+                                            durationMillis = 120
+                                        )
+                                )
+                            )
+                        .using(
+                            SizeTransform(
+                                clip = false
+                            )
+                        )
+                },
 
-                EmptyTasks(
-                    selectedTab = selectedTab
+                label = "header_transition"
+            ) { tab ->
+
+                TaskendaHeader(
+                    title = when (tab) {
+                        0 -> "Hoy"
+                        1 -> "Tareas"
+                        2 -> "Importantes"
+                        3 -> "Completadas"
+                        else -> "Tareas"
+                    },
+
+                    subtitle = when (tab) {
+                        0 ->
+                            "Tus tareas pendientes"
+
+                        1 ->
+                            "Todas las tareas pendientes"
+
+                        2 ->
+                            "Tareas marcadas como importantes"
+
+                        3 ->
+                            "Tareas que ya has terminado"
+
+                        else ->
+                            ""
+                    },
+
+                    taskCount =
+                        when (tab) {
+
+                            0 ->
+                                tasks.count {
+                                    !it.completed
+                                }
+
+                            1 ->
+                                tasks.count {
+                                    !it.completed
+                                }
+
+                            2 ->
+                                tasks.count {
+                                    !it.completed &&
+                                            it.important
+                                }
+
+                            3 ->
+                                tasks.count {
+                                    it.completed
+                                }
+
+                            else ->
+                                0
+                        }
                 )
+            }
 
-            } else {
+            /*
+             * CONTENIDO
+             *
+             * Fade + ligera escala.
+             *
+             * No usamos slide horizontal porque es precisamente
+             * lo que puede hacer que textos largos entren/salgan
+             * cortados durante la transición.
+             */
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
 
-                LazyColumn(
+                AnimatedContent(
+                    targetState = selectedTab,
                     modifier = Modifier.fillMaxSize(),
 
-                    contentPadding = PaddingValues(
-                        bottom = 76.dp
-                    ),
+                    transitionSpec = {
 
-                    verticalArrangement =
-                        Arrangement.spacedBy(10.dp)
-                ) {
-
-                    items(
-                        items = visibleTasks,
-                        key = { it.id }
-                    ) { task ->
-
-                        TaskRow(
-                            task = task,
-
-                            onToggle = {
-                                val index =
-                                    tasks.indexOfFirst {
-                                        it.id == task.id
-                                    }
-
-                                if (index >= 0) {
-
-                                    tasks[index] =
-                                        tasks[index].copy(
-                                            completed =
-                                                !tasks[index].completed
-                                        )
-
-                                    haptic.performHapticFeedback(
-                                        HapticFeedbackType.ToggleOn
+                        (
+                            fadeIn(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 190,
+                                        delayMillis = 35
                                     )
-
-                                    persist()
-                                }
-                            },
-
-                            onImportant = {
-                                val index =
-                                    tasks.indexOfFirst {
-                                        it.id == task.id
-                                    }
-
-                                if (index >= 0) {
-
-                                    tasks[index] =
-                                        tasks[index].copy(
-                                            important =
-                                                !tasks[index].important
+                            ) +
+                                scaleIn(
+                                    initialScale = 0.985f,
+                                    animationSpec =
+                                        tween(
+                                            durationMillis = 240,
+                                            easing =
+                                                FastOutSlowInEasing
                                         )
-
-                                    haptic.performHapticFeedback(
-                                        HapticFeedbackType.VirtualKey
+                                )
+                            ) togetherWith
+                            (
+                                fadeOut(
+                                    animationSpec =
+                                        tween(
+                                            durationMillis = 130
+                                        )
+                                ) +
+                                    scaleOut(
+                                        targetScale = 0.99f,
+                                        animationSpec =
+                                            tween(
+                                                durationMillis = 130
+                                            )
                                     )
+                                )
+                            )
+                            .using(
+                                SizeTransform(
+                                    clip = false
+                                )
+                            )
+                    },
 
-                                    persist()
-                                }
-                            },
+                    label = "category_transition"
+                ) { tab ->
 
-                            onEdit = {
-                                editingTask = task
-                                showEditor = true
-                            },
+                    val tabTasks =
+                        when (tab) {
 
-                            onDelete = {
-                                taskToDelete = task
+                            0 -> tasks.filter {
+                                !it.completed
+                            }
+
+                            1 -> tasks.filter {
+                                !it.completed
+                            }
+
+                            2 -> tasks.filter {
+                                !it.completed &&
+                                        it.important
+                            }
+
+                            3 -> tasks.filter {
+                                it.completed
+                            }
+
+                            else -> emptyList()
+                        }
+
+                    if (tabTasks.isEmpty()) {
+
+                        EmptyTasks(
+                            selectedTab = tab,
+                            onCreate = {
+
+                                haptic.performHapticFeedback(
+                                    HapticFeedbackType.LongPress
+                                )
+
+                                editingTask = null
+                                editorVisible = true
                             }
                         )
+
+                    } else {
+
+                        LazyColumn(
+                            modifier =
+                                Modifier.fillMaxSize(),
+
+                            contentPadding =
+                                PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 8.dp,
+                                    bottom = 110.dp
+                                ),
+
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    10.dp
+                                )
+                        ) {
+
+                            items(
+                                items = tabTasks,
+                                key = {
+                                    it.id
+                                }
+                            ) { task ->
+
+                                TaskRow(
+                                    task = task,
+
+                                    onToggleComplete = {
+
+                                        haptic.performHapticFeedback(
+                                            HapticFeedbackType.TextHandleMove
+                                        )
+
+                                        saveTasks(
+                                            tasks.map {
+
+                                                if (
+                                                    it.id ==
+                                                    task.id
+                                                ) {
+                                                    it.copy(
+                                                        completed =
+                                                            !it.completed
+                                                    )
+                                                } else {
+                                                    it
+                                                }
+                                            }
+                                        )
+                                    },
+
+                                    onToggleImportant = {
+
+                                        haptic.performHapticFeedback(
+                                            HapticFeedbackType.TextHandleMove
+                                        )
+
+                                        saveTasks(
+                                            tasks.map {
+
+                                                if (
+                                                    it.id ==
+                                                    task.id
+                                                ) {
+                                                    it.copy(
+                                                        important =
+                                                            !it.important
+                                                    )
+                                                } else {
+                                                    it
+                                                }
+                                            }
+                                        )
+                                    },
+
+                                    onEdit = {
+
+                                        editingTask =
+                                            task
+
+                                        editorVisible =
+                                            true
+                                    },
+
+                                    onDelete = {
+
+                                        saveTasks(
+                                            tasks.filter {
+                                                it.id != task.id
+                                            }
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    if (showEditor) {
+    if (editorVisible) {
 
         TaskEditorSheet(
             task = editingTask,
 
             onDismiss = {
-                showEditor = false
+
+                editorVisible = false
                 editingTask = null
             },
 
-            onSave = {
-                    title,
-                    notes,
-                    important,
-                    dueDate ->
+            onSave = { updatedTask ->
 
-                if (editingTask == null) {
-
-                    tasks.add(
-                        Task(
-                            title = title,
-                            notes = notes,
-                            important = important,
-                            dueDate = dueDate
-                        )
-                    )
-
-                } else {
-
-                    val index =
-                        tasks.indexOfFirst {
-                            it.id == editingTask!!.id
-                        }
-
-                    if (index >= 0) {
-
-                        tasks[index] =
-                            tasks[index].copy(
-                                title = title,
-                                notes = notes,
-                                important = important,
-                                dueDate = dueDate
-                            )
+                val exists =
+                    tasks.any {
+                        it.id == updatedTask.id
                     }
-                }
 
-                persist()
+                val newTasks =
+                    if (exists) {
 
-                haptic.performHapticFeedback(
-                    HapticFeedbackType.Confirm
-                )
+                        tasks.map {
 
-                showEditor = false
-                editingTask = null
-            }
-        )
-    }
-
-    taskToDelete?.let { task ->
-
-        AlertDialog(
-            onDismissRequest = {
-                taskToDelete = null
-            },
-
-            title = {
-                Text("Eliminar tarea")
-            },
-
-            text = {
-                Text(
-                    "¿Quieres eliminar «${task.title}»?"
-                )
-            },
-
-            confirmButton = {
-                TextButton(
-                    onClick = {
-
-                        tasks.removeAll {
-                            it.id == task.id
-                        }
-
-                        persist()
-
-                        haptic.performHapticFeedback(
-                            HapticFeedbackType.Reject
-                        )
-
-                        taskToDelete = null
-                    }
-                ) {
-                    Text("Eliminar")
-                }
-            },
-
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        taskToDelete = null
-                    }
-                ) {
-                    Text("Cancelar")
-                }
-            }
-        )
-    }
-}
-
-
-/* -------------------------------------------------------------------------- */
-/* BARRA INFERIOR                                                             */
-/* -------------------------------------------------------------------------- */
-
-@Composable
-private fun TaskendaBottomBar(
-    selectedTab: Int,
-    onTabSelected: (Int) -> Unit
-) {
-
-    val items = listOf(
-        BottomItem(
-            "Hoy",
-            Icons.Rounded.Home
-        ),
-        BottomItem(
-            "Tareas",
-            Icons.Rounded.TaskAlt
-        ),
-        BottomItem(
-            "Importantes",
-            Icons.Rounded.Star
-        ),
-        BottomItem(
-            "Completadas",
-            Icons.Rounded.Check
-        )
-    )
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(
-                start = 14.dp,
-                end = 14.dp,
-                bottom = 10.dp
-            ),
-
-        shape = RoundedCornerShape(30.dp),
-
-        color =
-            MaterialTheme.colorScheme.surfaceContainerHigh,
-
-        tonalElevation = 3.dp,
-
-        shadowElevation = 4.dp
-    ) {
-
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(68.dp)
-                .padding(5.dp)
-        ) {
-
-            val slotWidth =
-                maxWidth / items.size
-
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                items.forEachIndexed { index, item ->
-
-                    val selected =
-                        selectedTab == index
-
-                    Box(
-                        modifier = Modifier
-                            .width(slotWidth)
-                            .fillMaxHeight()
-                            .clickable {
-                                onTabSelected(index)
-                            },
-
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-
-                        if (selected) {
-
-                            Surface(
-                                modifier =
-                                    Modifier.fillMaxSize(
-                                        fraction = 0.94f
-                                    ),
-
-                                shape =
-                                    RoundedCornerShape(
-                                        25.dp
-                                    ),
-
-                                color =
-                                    MaterialTheme
-                                        .colorScheme
-                                        .primaryContainer
+                            if (
+                                it.id ==
+                                updatedTask.id
                             ) {
-
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize()
-                                            .padding(
-                                                horizontal = 8.dp
-                                            ),
-
-                                    horizontalArrangement =
-                                        Arrangement.Center,
-
-                                    verticalAlignment =
-                                        Alignment.CenterVertically
-                                ) {
-
-                                    Icon(
-                                        imageVector =
-                                            if (
-                                                index == 2
-                                            ) {
-                                                Icons.Rounded.Star
-                                            } else {
-                                                item.icon
-                                            },
-
-                                        contentDescription =
-                                            item.label,
-
-                                        modifier =
-                                            Modifier.size(
-                                                23.dp
-                                            ),
-
-                                        tint =
-                                            MaterialTheme
-                                                .colorScheme
-                                                .onPrimaryContainer
-                                    )
-
-                                    Spacer(
-                                        modifier =
-                                            Modifier.width(6.dp)
-                                    )
-
-                                    Text(
-                                        text = item.label,
-
-                                        style =
-                                            MaterialTheme
-                                                .typography
-                                                .labelMedium,
-
-                                        fontWeight =
-                                            FontWeight.SemiBold,
-
-                                        maxLines = 1,
-
-                                        color =
-                                            MaterialTheme
-                                                .colorScheme
-                                                .onPrimaryContainer
-                                    )
-                                }
+                                updatedTask
+                            } else {
+                                it
                             }
-
-                        } else {
-
-                            Icon(
-                                imageVector =
-                                    if (index == 2) {
-                                        Icons.Rounded.StarBorder
-                                    } else {
-                                        item.icon
-                                    },
-
-                                contentDescription =
-                                    item.label,
-
-                                modifier =
-                                    Modifier.size(24.dp),
-
-                                tint =
-                                    MaterialTheme
-                                        .colorScheme
-                                        .onSurfaceVariant
-                            )
                         }
+
+                    } else {
+
+                        tasks +
+                                updatedTask
                     }
-                }
+
+                saveTasks(newTasks)
+
+                editorVisible = false
+                editingTask = null
             }
-        }
+        )
     }
 }
-
-
-private data class BottomItem(
-    val label: String,
-    val icon: ImageVector
-)
-
-
-/* -------------------------------------------------------------------------- */
-/* CABECERA                                                                   */
-/* -------------------------------------------------------------------------- */
 
 @Composable
 private fun TaskendaHeader(
-    selectedTab: Int,
+    title: String,
+    subtitle: String,
     taskCount: Int
 ) {
 
-    val title =
-        when (selectedTab) {
-            0 -> "Hoy"
-            1 -> "Tareas"
-            2 -> "Importantes"
-            3 -> "Completadas"
-            else -> "Tareas"
-        }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = 20.dp,
+                end = 20.dp,
+                top = 20.dp,
+                bottom = 10.dp
+            ),
 
-    val subtitle =
-        when (selectedTab) {
-            0 -> "Tus tareas pendientes"
-            1 -> "Todas las tareas pendientes"
-            2 -> "Tareas marcadas como importantes"
-            3 -> "Tareas que ya has terminado"
-            else -> ""
-        }
-
-    Column(
-        modifier = Modifier.fillMaxWidth()
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment =
-                Alignment.CenterVertically
+        Column(
+            modifier =
+                Modifier.weight(1f)
         ) {
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Text(
+                text = title,
 
-                Text(
-                    text = title,
+                style =
+                    MaterialTheme.typography.headlineMedium,
 
-                    style =
-                        MaterialTheme
-                            .typography
-                            .headlineMedium,
+                fontWeight =
+                    FontWeight.Bold,
 
-                    fontWeight =
-                        FontWeight.Bold
-                )
+                maxLines = 1,
 
-                Spacer(
-                    modifier = Modifier.height(3.dp)
-                )
+                overflow =
+                    TextOverflow.Ellipsis
+            )
 
-                Text(
-                    text = subtitle,
+            Spacer(
+                modifier =
+                    Modifier.height(4.dp)
+            )
 
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodyMedium,
+            Text(
+                text = subtitle,
 
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .onSurfaceVariant
-                )
-            }
-
-            Surface(
-                shape = CircleShape,
+                style =
+                    MaterialTheme.typography.bodyLarge,
 
                 color =
-                    MaterialTheme
-                        .colorScheme
-                        .secondaryContainer
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+
+                maxLines = 2,
+
+                overflow =
+                    TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(
+            modifier =
+                Modifier.width(12.dp)
+        )
+
+        Surface(
+            modifier =
+                Modifier.size(48.dp),
+
+            shape =
+                CircleShape,
+
+            color =
+                MaterialTheme.colorScheme.secondaryContainer
+        ) {
+
+            Box(
+                contentAlignment =
+                    Alignment.Center
             ) {
 
                 Text(
-                    text = taskCount.toString(),
+                    text =
+                        taskCount.toString(),
 
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 13.dp,
-                            vertical = 8.dp
-                        ),
-
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .onSecondaryContainer,
+                    style =
+                        MaterialTheme.typography.titleMedium,
 
                     fontWeight =
-                        FontWeight.Bold
+                        FontWeight.SemiBold,
+
+                    color =
+                        MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
         }
     }
 }
 
-
-/* -------------------------------------------------------------------------- */
-/* ESTADO VACÍO                                                               */
-/* -------------------------------------------------------------------------- */
-
 @Composable
 private fun EmptyTasks(
-    selectedTab: Int
+    selectedTab: Int,
+    onCreate: () -> Unit
 ) {
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(
-                bottom = 90.dp
+                start = 32.dp,
+                end = 32.dp,
+                bottom = 60.dp
             ),
 
         contentAlignment =
@@ -863,21 +880,18 @@ private fun EmptyTasks(
 
         Column(
             horizontalAlignment =
-                Alignment.CenterHorizontally,
-
-            verticalArrangement =
-                Arrangement.spacedBy(10.dp)
+                Alignment.CenterHorizontally
         ) {
 
             Surface(
-                modifier = Modifier.size(76.dp),
+                modifier =
+                    Modifier.size(72.dp),
 
-                shape = CircleShape,
+                shape =
+                    CircleShape,
 
                 color =
-                    MaterialTheme
-                        .colorScheme
-                        .secondaryContainer
+                    MaterialTheme.colorScheme.secondaryContainer
             ) {
 
                 Box(
@@ -888,88 +902,109 @@ private fun EmptyTasks(
                     Icon(
                         imageVector =
                             when (selectedTab) {
-                                2 -> Icons.Rounded.StarBorder
-                                3 -> Icons.Rounded.Check
-                                else -> Icons.Rounded.TaskAlt
+                                2 ->
+                                    Icons.Default.Star
+
+                                3 ->
+                                    Icons.Default.CheckCircle
+
+                                else ->
+                                    Icons.Default.TaskAlt
                             },
 
-                        contentDescription = null,
+                        contentDescription =
+                            null,
 
                         modifier =
-                            Modifier.size(38.dp),
+                            Modifier.size(36.dp),
 
                         tint =
-                            MaterialTheme
-                                .colorScheme
-                                .onSecondaryContainer
+                            MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
 
-            Text(
-                text =
-                    when (selectedTab) {
-                        2 -> "No tienes tareas importantes"
-                        3 -> "Todavía no has completado tareas"
-                        else -> "No tienes tareas pendientes"
-                    },
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .titleMedium,
-
-                fontWeight =
-                    FontWeight.SemiBold
+            Spacer(
+                modifier =
+                    Modifier.height(18.dp)
             )
 
             Text(
                 text =
                     when (selectedTab) {
+
+                        2 ->
+                            "No tienes tareas importantes"
+
+                        3 ->
+                            "No tienes tareas completadas"
+
+                        else ->
+                            "No tienes tareas pendientes"
+                    },
+
+                style =
+                    MaterialTheme.typography.titleLarge,
+
+                fontWeight =
+                    FontWeight.SemiBold,
+
+                maxLines = 2,
+
+                overflow =
+                    TextOverflow.Ellipsis
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(6.dp)
+            )
+
+            Text(
+                text =
+                    when (selectedTab) {
+
                         2 ->
                             "Marca una tarea como importante para verla aquí."
 
                         3 ->
-                            "Cuando completes una tarea aparecerá aquí."
+                            "Las tareas que completes aparecerán aquí."
 
                         else ->
                             "Pulsa + para crear tu primera tarea."
                     },
 
                 style =
-                    MaterialTheme
-                        .typography
-                        .bodyMedium,
+                    MaterialTheme.typography.bodyLarge,
 
                 color =
-                    MaterialTheme
-                        .colorScheme
-                        .onSurfaceVariant
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+
+                maxLines = 3,
+
+                overflow =
+                    TextOverflow.Ellipsis
             )
         }
     }
 }
 
-
-/* -------------------------------------------------------------------------- */
-/* FILA DE TAREA                                                              */
-/* -------------------------------------------------------------------------- */
-
 @Composable
 private fun TaskRow(
     task: Task,
-    onToggle: () -> Unit,
-    onImportant: () -> Unit,
+    onToggleComplete: () -> Unit,
+    onToggleImportant: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
 
-    var menuExpanded by remember(task.id) {
+    var menuExpanded by remember {
         mutableStateOf(false)
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier.fillMaxWidth(),
 
         shape =
             RoundedCornerShape(22.dp),
@@ -977,30 +1012,18 @@ private fun TaskRow(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    MaterialTheme
-                        .colorScheme
-                        .surfaceContainer
-            ),
-
-        border =
-            if (task.important) {
-                BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary
-                )
-            } else {
-                null
-            }
+                    MaterialTheme.colorScheme.surfaceContainer
+            )
     ) {
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    start = 12.dp,
+                    start = 10.dp,
                     end = 8.dp,
-                    top = 12.dp,
-                    bottom = 12.dp
+                    top = 10.dp,
+                    bottom = 10.dp
                 ),
 
             verticalAlignment =
@@ -1008,46 +1031,50 @@ private fun TaskRow(
         ) {
 
             TaskCheckbox(
-                checked = task.completed,
-                onClick = onToggle
+                checked =
+                    task.completed,
+
+                onCheckedChange =
+                    onToggleComplete
             )
 
             Spacer(
-                modifier = Modifier.width(12.dp)
+                modifier =
+                    Modifier.width(8.dp)
             )
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onEdit()
+                    }
+                    .padding(
+                        vertical = 4.dp
+                    )
             ) {
 
                 Text(
-                    text = task.title,
+                    text =
+                        task.title,
 
                     style =
-                        MaterialTheme
-                            .typography
-                            .titleMedium,
+                        MaterialTheme.typography.bodyLarge,
 
                     fontWeight =
-                        FontWeight.SemiBold,
-
-                    textDecoration =
-                        if (task.completed) {
-                            TextDecoration.LineThrough
-                        } else {
-                            TextDecoration.None
-                        },
+                        FontWeight.Medium,
 
                     color =
                         if (task.completed) {
-                            MaterialTheme
-                                .colorScheme
-                                .onSurfaceVariant
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         } else {
-                            MaterialTheme
-                                .colorScheme
-                                .onSurface
-                        }
+                            MaterialTheme.colorScheme.onSurface
+                        },
+
+                    maxLines = 2,
+
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
 
                 if (task.notes.isNotBlank()) {
@@ -1058,34 +1085,27 @@ private fun TaskRow(
                     )
 
                     Text(
-                        text = task.notes,
+                        text =
+                            task.notes,
 
                         style =
-                            MaterialTheme
-                                .typography
-                                .bodyMedium,
+                            MaterialTheme.typography.bodySmall,
+
+                        color =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
 
                         maxLines = 2,
 
-                        color =
-                            MaterialTheme
-                                .colorScheme
-                                .onSurfaceVariant,
-
-                        textDecoration =
-                            if (task.completed) {
-                                TextDecoration.LineThrough
-                            } else {
-                                TextDecoration.None
-                            }
+                        overflow =
+                            TextOverflow.Ellipsis
                     )
                 }
 
-                if (task.dueDate.isNotBlank()) {
+                if (task.dueDate != null) {
 
                     Spacer(
                         modifier =
-                            Modifier.height(6.dp)
+                            Modifier.height(5.dp)
                     )
 
                     Row(
@@ -1095,7 +1115,7 @@ private fun TaskRow(
 
                         Icon(
                             imageVector =
-                                Icons.Rounded.Today,
+                                Icons.Outlined.Event,
 
                             contentDescription =
                                 null,
@@ -1104,9 +1124,7 @@ private fun TaskRow(
                                 Modifier.size(15.dp),
 
                             tint =
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Spacer(
@@ -1115,32 +1133,32 @@ private fun TaskRow(
                         )
 
                         Text(
-                            text = task.dueDate,
+                            text =
+                                formatDate(
+                                    task.dueDate
+                                ),
 
                             style =
-                                MaterialTheme
-                                    .typography
-                                    .labelMedium,
+                                MaterialTheme.typography.labelSmall,
 
                             color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
             IconButton(
-                onClick = onImportant
+                onClick =
+                    onToggleImportant
             ) {
 
                 Icon(
                     imageVector =
                         if (task.important) {
-                            Icons.Rounded.Star
+                            Icons.Default.Star
                         } else {
-                            Icons.Rounded.StarBorder
+                            Icons.Default.StarBorder
                         },
 
                     contentDescription =
@@ -1152,13 +1170,9 @@ private fun TaskRow(
 
                     tint =
                         if (task.important) {
-                            MaterialTheme
-                                .colorScheme
-                                .primary
+                            MaterialTheme.colorScheme.primary
                         } else {
-                            MaterialTheme
-                                .colorScheme
-                                .onSurfaceVariant
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         }
                 )
             }
@@ -1173,7 +1187,7 @@ private fun TaskRow(
 
                     Icon(
                         imageVector =
-                            Icons.Rounded.MoreVert,
+                            Icons.Default.MoreVert,
 
                         contentDescription =
                             "Más opciones"
@@ -1181,7 +1195,8 @@ private fun TaskRow(
                 }
 
                 DropdownMenu(
-                    expanded = menuExpanded,
+                    expanded =
+                        menuExpanded,
 
                     onDismissRequest = {
                         menuExpanded = false
@@ -1195,8 +1210,11 @@ private fun TaskRow(
 
                         leadingIcon = {
                             Icon(
-                                Icons.Rounded.Edit,
-                                contentDescription = null
+                                imageVector =
+                                    Icons.Default.Edit,
+
+                                contentDescription =
+                                    null
                             )
                         },
 
@@ -1213,8 +1231,11 @@ private fun TaskRow(
 
                         leadingIcon = {
                             Icon(
-                                Icons.Rounded.Delete,
-                                contentDescription = null
+                                imageVector =
+                                    Icons.Default.Delete,
+
+                                contentDescription =
+                                    null
                             )
                         },
 
@@ -1229,45 +1250,47 @@ private fun TaskRow(
     }
 }
 
-
-/* -------------------------------------------------------------------------- */
-/* CHECKBOX                                                                   */
-/* -------------------------------------------------------------------------- */
-
 @Composable
 private fun TaskCheckbox(
     checked: Boolean,
-    onClick: () -> Unit
+    onCheckedChange: () -> Unit
 ) {
+
+    val haptic =
+        LocalHapticFeedback.current
 
     Surface(
         modifier = Modifier
-            .size(34.dp)
+            .size(44.dp)
+            .clip(CircleShape)
             .clickable {
-                onClick()
+
+                haptic.performHapticFeedback(
+                    HapticFeedbackType.TextHandleMove
+                )
+
+                onCheckedChange()
             },
 
-        shape = CircleShape,
+        shape =
+            CircleShape,
 
         color =
             if (checked) {
-                MaterialTheme
-                    .colorScheme
-                    .primary
+                MaterialTheme.colorScheme.primary
             } else {
                 Color.Transparent
             },
 
         border =
-            if (checked) {
-                null
-            } else {
+            if (!checked) {
                 BorderStroke(
-                    2.dp,
-                    MaterialTheme
-                        .colorScheme
-                        .outline
+                    width = 2.dp,
+                    color =
+                        MaterialTheme.colorScheme.outline
                 )
+            } else {
+                null
             }
     ) {
 
@@ -1280,40 +1303,28 @@ private fun TaskCheckbox(
 
                 Icon(
                     imageVector =
-                        Icons.Rounded.Check,
+                        Icons.Default.Check,
 
                     contentDescription =
                         "Completada",
 
-                    modifier =
-                        Modifier.size(21.dp),
-
                     tint =
-                        MaterialTheme
-                            .colorScheme
-                            .onPrimary
+                        MaterialTheme.colorScheme.onPrimary,
+
+                    modifier =
+                        Modifier.size(25.dp)
                 )
             }
         }
     }
 }
 
-
-/* -------------------------------------------------------------------------- */
-/* EDITOR                                                                     */
-/* -------------------------------------------------------------------------- */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskEditorSheet(
     task: Task?,
     onDismiss: () -> Unit,
-    onSave: (
-        String,
-        String,
-        Boolean,
-        String
-    ) -> Unit
+    onSave: (Task) -> Unit
 ) {
 
     var title by remember(task) {
@@ -1336,91 +1347,56 @@ private fun TaskEditorSheet(
 
     var dueDate by remember(task) {
         mutableStateOf(
-            task?.dueDate ?: ""
+            task?.dueDate
         )
     }
 
-    var showDatePicker by remember {
+    var datePickerVisible by remember {
         mutableStateOf(false)
     }
 
-    val sheetState =
-        rememberModalBottomSheetState(
-            skipPartiallyExpanded = true
-        )
-
     ModalBottomSheet(
+        onDismissRequest =
+            onDismiss,
 
-        onDismissRequest = onDismiss,
-
-        sheetState = sheetState,
-
-        modifier =
-            Modifier.imePadding()
+        containerColor =
+            MaterialTheme.colorScheme.surface
     ) {
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .wrapContentHeight()
                 .padding(
                     start = 20.dp,
                     end = 20.dp,
-                    bottom = 20.dp
-                ),
-
-            verticalArrangement =
-                Arrangement.spacedBy(14.dp)
+                    bottom = 24.dp
+                )
         ) {
 
-            Row(
+            Text(
+                text =
+                    if (task == null) {
+                        "Nueva tarea"
+                    } else {
+                        "Editar tarea"
+                    },
+
+                style =
+                    MaterialTheme.typography.headlineSmall,
+
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            Spacer(
                 modifier =
-                    Modifier.fillMaxWidth(),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Column(
-                    modifier =
-                        Modifier.weight(1f)
-                ) {
-
-                    Text(
-                        text =
-                            if (task == null) {
-                                "Nueva tarea"
-                            } else {
-                                "Editar tarea"
-                            },
-
-                        style =
-                            MaterialTheme
-                                .typography
-                                .headlineSmall,
-
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        text =
-                            "Organiza lo que tienes pendiente",
-
-                        style =
-                            MaterialTheme
-                                .typography
-                                .bodyMedium,
-
-                        color =
-                            MaterialTheme
-                                .colorScheme
-                                .onSurfaceVariant
-                    )
-                }
-            }
+                    Modifier.height(18.dp)
+            )
 
             OutlinedTextField(
-                value = title,
+                value =
+                    title,
 
                 onValueChange = {
                     title = it
@@ -1429,275 +1405,62 @@ private fun TaskEditorSheet(
                 modifier =
                     Modifier.fillMaxWidth(),
 
-                singleLine = true,
-
                 label = {
                     Text("Tarea")
                 },
 
                 placeholder = {
-                    Text("¿Qué tienes que hacer?")
+                    Text("¿Qué quieres hacer?")
                 },
 
-                shape =
-                    RoundedCornerShape(18.dp)
+                singleLine = true
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(12.dp)
             )
 
             OutlinedTextField(
-                value = notes,
+                value =
+                    notes,
 
                 onValueChange = {
                     notes = it
                 },
 
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
 
                 label = {
                     Text("Notas")
                 },
 
                 placeholder = {
-                    Text("Añade detalles opcionales")
-                },
-
-                shape =
-                    RoundedCornerShape(18.dp)
+                    Text(
+                        "Añade información opcional"
+                    )
+                }
             )
 
-            Surface(
+            Spacer(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            showDatePicker = true
-                        },
+                    Modifier.height(12.dp)
+            )
 
-                shape =
-                    RoundedCornerShape(18.dp),
-
-                color =
-                    MaterialTheme
-                        .colorScheme
-                        .surfaceContainerHigh,
-
-                border =
-                    BorderStroke(
-                        1.dp,
-                        MaterialTheme
-                            .colorScheme
-                            .outlineVariant
-                    )
-            ) {
-
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Rounded.Today,
-
-                        contentDescription =
-                            null,
-
-                        tint =
-                            MaterialTheme
-                                .colorScheme
-                                .primary
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.width(12.dp)
-                    )
-
-                    Column(
-                        modifier =
-                            Modifier.weight(1f)
-                    ) {
-
-                        Text(
-                            text = "Fecha",
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .labelMedium,
-
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant
-                        )
-
-                        Text(
-                            text =
-                                if (dueDate.isBlank()) {
-                                    "Sin fecha"
-                                } else {
-                                    dueDate
-                                },
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .bodyLarge,
-
-                            fontWeight =
-                                FontWeight.Medium
-                        )
-                    }
-
-                    if (dueDate.isNotBlank()) {
-
-                        TextButton(
-                            onClick = {
-                                dueDate = ""
-                            }
-                        ) {
-                            Text("Quitar")
-                        }
-                    }
-                }
-            }
-
-            Surface(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                shape =
-                    RoundedCornerShape(18.dp),
-
-                color =
-                    MaterialTheme
-                        .colorScheme
-                        .surfaceContainerHigh
-            ) {
-
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = 16.dp,
-                                vertical = 10.dp
-                            ),
-
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-
-                    Icon(
-                        imageVector =
-                            if (important) {
-                                Icons.Rounded.Star
-                            } else {
-                                Icons.Rounded.StarBorder
-                            },
-
-                        contentDescription =
-                            null,
-
-                        tint =
-                            if (important) {
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary
-                            } else {
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant
-                            }
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.width(12.dp)
-                    )
-
-                    Column(
-                        modifier =
-                            Modifier.weight(1f)
-                    ) {
-
-                        Text(
-                            text = "Importante",
-
-                            fontWeight =
-                                FontWeight.SemiBold
-                        )
-
-                        Text(
-                            text =
-                                "Marca esta tarea como prioritaria",
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .bodySmall,
-
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant
-                        )
-                    }
-
-                    Switch(
-                        checked = important,
-
-                        onCheckedChange = {
-                            important = it
-                        }
-                    )
-                }
-            }
-
-            Button(
+            OutlinedButton(
                 onClick = {
-
-                    val cleanTitle =
-                        title.trim()
-
-                    if (cleanTitle.isNotEmpty()) {
-
-                        onSave(
-                            cleanTitle,
-                            notes.trim(),
-                            important,
-                            dueDate
-                        )
-                    }
+                    datePickerVisible = true
                 },
 
-                enabled =
-                    title.trim().isNotEmpty(),
-
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-
-                shape =
-                    RoundedCornerShape(18.dp)
+                    Modifier.fillMaxWidth()
             ) {
 
                 Icon(
                     imageVector =
-                        if (task == null) {
-                            Icons.Rounded.Add
-                        } else {
-                            Icons.Rounded.Check
-                        },
+                        Icons.Outlined.Event,
 
                     contentDescription =
                         null
@@ -1709,73 +1472,195 @@ private fun TaskEditorSheet(
                 )
 
                 Text(
-                    if (task == null) {
-                        "Crear tarea"
-                    } else {
-                        "Guardar cambios"
+                    text =
+                        dueDate?.let {
+                            formatDate(it)
+                        } ?: "Añadir fecha",
+
+                    modifier =
+                        Modifier.weight(1f)
+                )
+
+                if (dueDate != null) {
+
+                    TextButton(
+                        onClick = {
+                            dueDate = null
+                        }
+                    ) {
+                        Text("Quitar")
                     }
+                }
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.height(8.dp)
+            )
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Icon(
+                    imageVector =
+                        if (important) {
+                            Icons.Default.Star
+                        } else {
+                            Icons.Default.StarBorder
+                        },
+
+                    contentDescription =
+                        null,
+
+                    tint =
+                        if (important) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.width(10.dp)
+                )
+
+                Text(
+                    text =
+                        "Importante",
+
+                    modifier =
+                        Modifier.weight(1f),
+
+                    style =
+                        MaterialTheme.typography.bodyLarge
+                )
+
+                Switch(
+                    checked =
+                        important,
+
+                    onCheckedChange = {
+                        important = it
+                    }
+                )
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.height(14.dp)
+            )
+
+            Button(
+                onClick = {
+
+                    val cleanTitle =
+                        title.trim()
+
+                    if (
+                        cleanTitle.isBlank()
+                    ) {
+                        return@Button
+                    }
+
+                    onSave(
+                        Task(
+                            id =
+                                task?.id
+                                    ?: System.currentTimeMillis(),
+
+                            title =
+                                cleanTitle,
+
+                            notes =
+                                notes.trim(),
+
+                            completed =
+                                task?.completed
+                                    ?: false,
+
+                            important =
+                                important,
+
+                            dueDate =
+                                dueDate
+                        )
+                    )
+                },
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                enabled =
+                    title.trim().isNotBlank()
+            ) {
+
+                Text(
+                    text =
+                        if (task == null) {
+                            "Crear tarea"
+                        } else {
+                            "Guardar cambios"
+                        }
                 )
             }
         }
     }
 
-    if (showDatePicker) {
+    if (datePickerVisible) {
 
         TaskDatePickerDialog(
-            currentDate = dueDate,
+            initialDate =
+                dueDate,
 
             onDismiss = {
-                showDatePicker = false
+                datePickerVisible = false
             },
 
-            onDateSelected = { date ->
-
-                dueDate = date
-                showDatePicker = false
+            onDateSelected = {
+                dueDate = it
+                datePickerVisible = false
             }
         )
     }
 }
 
-
-/* -------------------------------------------------------------------------- */
-/* SELECTOR DE FECHA                                                          */
-/* -------------------------------------------------------------------------- */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskDatePickerDialog(
-    currentDate: String,
+    initialDate: Long?,
     onDismiss: () -> Unit,
-    onDateSelected: (String) -> Unit
+    onDateSelected: (Long) -> Unit
 ) {
 
-    val state =
+    val datePickerState =
         rememberDatePickerState(
             initialSelectedDateMillis =
-                parseDateMillis(currentDate)
+                initialDate
         )
 
     DatePickerDialog(
-
-        onDismissRequest = onDismiss,
+        onDismissRequest =
+            onDismiss,
 
         confirmButton = {
 
             TextButton(
                 onClick = {
 
-                    val millis =
-                        state.selectedDateMillis
+                    val selected =
+                        datePickerState.selectedDateMillis
 
-                    if (millis != null) {
-
+                    if (selected != null) {
                         onDateSelected(
-                            formatDateMillis(millis)
+                            selected
                         )
-
                     } else {
-
                         onDismiss()
                     }
                 }
@@ -1787,7 +1672,8 @@ private fun TaskDatePickerDialog(
         dismissButton = {
 
             TextButton(
-                onClick = onDismiss
+                onClick =
+                    onDismiss
             ) {
                 Text("Cancelar")
             }
@@ -1795,83 +1681,384 @@ private fun TaskDatePickerDialog(
     ) {
 
         DatePicker(
-            state = state
+            state =
+                datePickerState
         )
     }
 }
 
+/*
+ * ============================================================
+ * BARRA INFERIOR
+ * ============================================================
+ *
+ * Esta es la parte más importante del cambio.
+ *
+ * Antes:
+ *
+ *  25% | 25% | 25% | 25%
+ *
+ * Cada elemento tenía siempre el mismo ancho.
+ *
+ * Ahora:
+ *
+ *  seleccionado = se expande
+ *  resto        = se comprime
+ *
+ * Igual que en Diario.
+ *
+ * Además, la etiqueta aparece con un pequeño retraso,
+ * cuando el botón ya tiene espacio suficiente.
+ */
+@Composable
+private fun TaskendaBottomBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit
+) {
 
-/* -------------------------------------------------------------------------- */
-/* FECHAS                                                                     */
-/* -------------------------------------------------------------------------- */
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(
+                start = 12.dp,
+                end = 12.dp,
+                bottom = 8.dp
+            ),
 
-private fun parseDateMillis(
-    value: String
-): Long? {
+        shape =
+            RoundedCornerShape(28.dp),
 
-    if (value.isBlank()) {
-        return null
-    }
+        tonalElevation =
+            4.dp,
 
-    return try {
+        shadowElevation =
+            6.dp,
 
-        val formatter =
-            SimpleDateFormat(
-                "dd/MM/yyyy",
-                Locale.getDefault()
+        color =
+            MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(
+                    horizontal = 6.dp
+                ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            TaskendaBottomItem(
+                selected =
+                    selectedTab == 0,
+
+                icon = {
+
+                    Icon(
+                        imageVector =
+                            if (selectedTab == 0) {
+                                Icons.Default.CheckCircle
+                            } else {
+                                Icons.Outlined.CheckCircle
+                            },
+
+                        contentDescription =
+                            "Hoy"
+                    )
+                },
+
+                label =
+                    "Hoy",
+
+                onClick = {
+                    onTabSelected(0)
+                }
             )
 
-        formatter.isLenient = false
+            TaskendaBottomItem(
+                selected =
+                    selectedTab == 1,
 
-        val date =
-            formatter.parse(value)
-                ?: return null
+                icon = {
 
-        val calendar =
-            Calendar.getInstance()
+                    Icon(
+                        imageVector =
+                            if (selectedTab == 1) {
+                                Icons.Default.TaskAlt
+                            } else {
+                                Icons.Outlined.CheckCircle
+                            },
 
-        calendar.time = date
+                        contentDescription =
+                            "Tareas"
+                    )
+                },
 
-        calendar.set(
-            Calendar.HOUR_OF_DAY,
-            12
-        )
+                label =
+                    "Tareas",
 
-        calendar.set(
-            Calendar.MINUTE,
-            0
-        )
+                onClick = {
+                    onTabSelected(1)
+                }
+            )
 
-        calendar.set(
-            Calendar.SECOND,
-            0
-        )
+            TaskendaBottomItem(
+                selected =
+                    selectedTab == 2,
 
-        calendar.set(
-            Calendar.MILLISECOND,
-            0
-        )
+                icon = {
 
-        calendar.timeInMillis
+                    Icon(
+                        imageVector =
+                            if (selectedTab == 2) {
+                                Icons.Default.Star
+                            } else {
+                                Icons.Outlined.StarBorder
+                            },
 
-    } catch (_: Exception) {
+                        contentDescription =
+                            "Importantes"
+                    )
+                },
 
-        null
+                label =
+                    "Importantes",
+
+                onClick = {
+                    onTabSelected(2)
+                }
+            )
+
+            TaskendaBottomItem(
+                selected =
+                    selectedTab == 3,
+
+                icon = {
+
+                    Icon(
+                        imageVector =
+                            if (selectedTab == 3) {
+                                Icons.Default.Check
+                            } else {
+                                Icons.Default.CheckCircle
+                            },
+
+                        contentDescription =
+                            "Completadas"
+                    )
+                },
+
+                label =
+                    "Completadas",
+
+                onClick = {
+                    onTabSelected(3)
+                }
+            )
+        }
     }
 }
 
+@Composable
+private fun TaskendaBottomItem(
+    selected: Boolean,
+    icon: @Composable () -> Unit,
+    label: String,
+    onClick: () -> Unit
+) {
 
-private fun formatDateMillis(
+    /*
+     * El seleccionado gana bastante espacio.
+     *
+     * 1.70 seleccionado
+     * 0.77 cada no seleccionado
+     *
+     * Esto deja suficiente espacio para:
+     * "Importantes"
+     * "Completadas"
+     */
+    val targetWeight =
+        if (selected) {
+            1.70f
+        } else {
+            0.77f
+        }
+
+    val animatedWeight by
+        animateFloatAsState(
+            targetValue =
+                targetWeight,
+
+            animationSpec =
+                tween(
+                    durationMillis = 300,
+                    easing =
+                        FastOutSlowInEasing
+                ),
+
+            label =
+                "bottom_item_weight"
+        )
+
+    Surface(
+        modifier = Modifier
+            .weight(
+                animatedWeight
+            )
+            .fillMaxHeight()
+            .padding(
+                horizontal = 2.dp,
+                vertical = 5.dp
+            )
+            .clip(
+                RoundedCornerShape(24.dp)
+            )
+            .clickable {
+                onClick()
+            },
+
+        color =
+            Color.Transparent
+    ) {
+
+        Box(
+            modifier =
+                Modifier.fillMaxSize(),
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .then(
+                        if (selected) {
+                            Modifier
+                                .padding(
+                                    horizontal = 1.dp
+                                )
+                        } else {
+                            Modifier
+                        }
+                    ),
+
+                shape =
+                    RoundedCornerShape(24.dp),
+
+                color =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        Color.Transparent
+                    }
+            ) {
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(
+                            horizontal =
+                                if (selected) {
+                                    14.dp
+                                } else {
+                                    8.dp
+                                }
+                        )
+                        .animateContentSize(
+                            animationSpec =
+                                tween(
+                                    durationMillis = 220,
+                                    easing =
+                                        FastOutSlowInEasing
+                                )
+                        ),
+
+                    horizontalArrangement =
+                        Arrangement.Center,
+
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    icon()
+
+                    /*
+                     * La etiqueta aparece después de que
+                     * el elemento haya empezado a expandirse.
+                     *
+                     * Así evitamos el problema anterior:
+                     *
+                     * IMPORTA
+                     *
+                     * mientras todavía no había ancho
+                     * suficiente para IMPORTANTE.
+                     */
+                    AnimatedVisibility(
+                        visible =
+                            selected,
+
+                        enter =
+                            fadeIn(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 160,
+                                        delayMillis = 90
+                                    )
+                            ),
+
+                        exit =
+                            fadeOut(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 90
+                                    )
+                            )
+                    ) {
+
+                        Row {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.width(7.dp)
+                            )
+
+                            Text(
+                                text =
+                                    label,
+
+                                style =
+                                    MaterialTheme.typography.labelLarge,
+
+                                fontWeight =
+                                    FontWeight.SemiBold,
+
+                                maxLines = 1,
+
+                                softWrap = false,
+
+                                overflow =
+                                    TextOverflow.Visible
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatDate(
     millis: Long
 ): String {
 
-    val formatter =
-        SimpleDateFormat(
-            "dd/MM/yyyy",
-            Locale.getDefault()
-        )
-
-    return formatter.format(
+    return SimpleDateFormat(
+        "d MMM",
+        Locale("es", "ES")
+    ).format(
         Date(millis)
     )
 }
