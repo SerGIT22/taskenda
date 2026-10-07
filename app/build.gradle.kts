@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
@@ -12,8 +13,38 @@ android {
         applicationId = "com.sergio.taskenda"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+
+        // En GitHub Actions aumenta automáticamente con cada ejecución.
+        // Si se compila fuera de GitHub, empieza en 2.
+        versionCode = maxOf(
+            2,
+            System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
+        )
+
         versionName = "1.0"
+    }
+
+    signingConfigs {
+        create("github") {
+            val keystorePath = System.getenv("TASKENDA_KEYSTORE_PATH")
+
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("TASKENDA_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("TASKENDA_KEY_ALIAS")
+                keyPassword = System.getenv("TASKENDA_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            val keystorePath = System.getenv("TASKENDA_KEYSTORE_PATH")
+
+            if (!keystorePath.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("github")
+            }
+        }
     }
 
     buildFeatures {
@@ -29,7 +60,6 @@ android {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.08.00")
-
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
