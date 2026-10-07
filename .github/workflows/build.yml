@@ -33,7 +33,7 @@ jobs:
         with:
           packages: 'platform-tools'
 
-      - name: Show available Android SDK packages
+      - name: Show Android SDK information
         run: |
           echo "===== SDK INSTALADO ====="
           sdkmanager --list_installed || true
@@ -59,14 +59,24 @@ jobs:
             exit 1
           fi
 
-          echo "$TASKENDA_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/app/taskenda-debug.keystore"
+          printf '%s' "$TASKENDA_KEYSTORE_BASE64" \
+            | tr -d '\r\n\t ' \
+            | base64 --decode > "$GITHUB_WORKSPACE/app/taskenda-debug.keystore"
 
-          if [ ! -f "$GITHUB_WORKSPACE/app/taskenda-debug.keystore" ]; then
+          if [ ! -s "$GITHUB_WORKSPACE/app/taskenda-debug.keystore" ]; then
             echo "No se pudo crear el keystore"
             exit 1
           fi
 
-          echo "Keystore preparado correctamente."
+          echo "Comprobando keystore..."
+
+          keytool -list \
+            -keystore "$GITHUB_WORKSPACE/app/taskenda-debug.keystore" \
+            -storepass "${{ secrets.TASKENDA_KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.TASKENDA_KEY_ALIAS }}" \
+            > /dev/null
+
+          echo "Keystore válido y alias correcto."
 
       - name: Build debug APK
         env:
