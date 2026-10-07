@@ -1,10 +1,7 @@
 package com.sergio.taskenda
 
-import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -85,11 +82,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.sergio.taskenda.data.Task
@@ -145,6 +142,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun TaskendaApp(vm: TaskViewModel) {
 
+    val view = LocalView.current
     val tasks by vm.tasks.collectAsState()
 
     var selectedTab by remember {
@@ -198,6 +196,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
+                    performHaptic(view)
                     editingTask = null
                     editorVisible = true
                 },
@@ -289,6 +288,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         EmptyTasks(
                             selectedTab = tab,
                             onCreate = {
+                                performHaptic(view)
                                 editingTask = null
                                 editorVisible = true
                             }
@@ -505,7 +505,7 @@ private fun TaskRow(
     onDelete: () -> Unit
 ) {
 
-    val context = LocalContext.current
+    val view = LocalView.current
     var menuExpanded by remember(task.id) {
         mutableStateOf(false)
     }
@@ -536,7 +536,7 @@ private fun TaskRow(
             TaskCheckbox(
                 checked = task.completed,
                 onCheckedChange = {
-                    vibrate(context)
+                    performHaptic(view)
                     onToggleComplete()
                 }
             )
@@ -598,7 +598,12 @@ private fun TaskRow(
                 }
             }
 
-            IconButton(onClick = onToggleImportant) {
+            IconButton(
+                onClick = {
+                    performHaptic(view)
+                    onToggleImportant()
+                }
+            ) {
                 Icon(
                     imageVector = if (task.important) {
                         Icons.Default.Star
@@ -619,7 +624,12 @@ private fun TaskRow(
             }
 
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(
+                    onClick = {
+                        performHaptic(view)
+                        menuExpanded = true
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Más opciones"
@@ -639,6 +649,7 @@ private fun TaskRow(
                             )
                         },
                         onClick = {
+                            performHaptic(view)
                             menuExpanded = false
                             onEdit()
                         }
@@ -653,6 +664,7 @@ private fun TaskRow(
                             )
                         },
                         onClick = {
+                            performHaptic(view)
                             menuExpanded = false
                             onDelete()
                         }
@@ -669,40 +681,42 @@ private fun TaskCheckbox(
     onCheckedChange: () -> Unit
 ) {
 
-    Surface(
-        modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .combinedClickable(onClick = onCheckedChange),
-        shape = CircleShape,
-        color = if (checked) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            Color.Transparent
-        },
-        border = if (checked) {
-            null
-        } else {
-            BorderStroke(
-                width = 2.dp,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
+    IconButton(
+        onClick = onCheckedChange,
+        modifier = Modifier.size(48.dp)
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            AnimatedContent(
-                targetState = checked,
-                label = "task_checkbox"
-            ) { isChecked ->
-                if (isChecked) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Completada",
-                        modifier = Modifier.size(25.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Spacer(Modifier.size(1.dp))
+        Surface(
+            modifier = Modifier.size(28.dp),
+            shape = CircleShape,
+            color = if (checked) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                Color.Transparent
+            },
+            border = if (checked) {
+                null
+            } else {
+                BorderStroke(
+                    width = 2.dp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                AnimatedContent(
+                    targetState = checked,
+                    label = "task_checkbox"
+                ) { isChecked ->
+                    if (isChecked) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Completada",
+                            modifier = Modifier.size(19.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Spacer(Modifier.size(1.dp))
+                    }
                 }
             }
         }
@@ -716,6 +730,8 @@ private fun TaskEditorSheet(
     onDismiss: () -> Unit,
     onSave: (Task) -> Unit
 ) {
+
+    val view = LocalView.current
 
     var title by remember(task?.id) {
         mutableStateOf(task?.title.orEmpty())
@@ -783,7 +799,10 @@ private fun TaskEditorSheet(
             )
 
             OutlinedButton(
-                onClick = { datePickerVisible = true },
+                onClick = {
+                    performHaptic(view)
+                    datePickerVisible = true
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
@@ -800,7 +819,10 @@ private fun TaskEditorSheet(
 
             if (dueDate != null) {
                 TextButton(
-                    onClick = { dueDate = null },
+                    onClick = {
+                        performHaptic(view)
+                        dueDate = null
+                    },
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text("Quitar fecha")
@@ -836,12 +858,16 @@ private fun TaskEditorSheet(
 
                 Switch(
                     checked = important,
-                    onCheckedChange = { important = it }
+                    onCheckedChange = {
+                        performHaptic(view)
+                        important = it
+                    }
                 )
             }
 
             Button(
                 onClick = {
+                    performHaptic(view)
                     val cleanTitle = title.trim()
                     if (cleanTitle.isBlank()) return@Button
 
@@ -893,6 +919,7 @@ private fun TaskDatePickerDialog(
     onDateSelected: (Long) -> Unit
 ) {
 
+    val view = LocalView.current
     val state = rememberDatePickerState(
         initialSelectedDateMillis = initialDate
     )
@@ -902,6 +929,7 @@ private fun TaskDatePickerDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    performHaptic(view)
                     val selected = state.selectedDateMillis
                     if (selected != null) {
                         onDateSelected(selected)
@@ -914,7 +942,12 @@ private fun TaskDatePickerDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    performHaptic(view)
+                    onDismiss()
+                }
+            ) {
                 Text("Cancelar")
             }
         }
@@ -928,6 +961,8 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
+
+    val view = LocalView.current
 
     Surface(
         modifier = Modifier
@@ -952,7 +987,7 @@ private fun TaskendaBottomBar(
         ) {
             NavigationBarItem(
                 selected = selectedTab == 0,
-                onClick = { onTabSelected(0) },
+                onClick = { performHaptic(view); onTabSelected(0) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
@@ -972,7 +1007,7 @@ private fun TaskendaBottomBar(
 
             NavigationBarItem(
                 selected = selectedTab == 1,
-                onClick = { onTabSelected(1) },
+                onClick = { performHaptic(view); onTabSelected(1) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
@@ -992,7 +1027,7 @@ private fun TaskendaBottomBar(
 
             NavigationBarItem(
                 selected = selectedTab == 2,
-                onClick = { onTabSelected(2) },
+                onClick = { performHaptic(view); onTabSelected(2) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
@@ -1012,7 +1047,7 @@ private fun TaskendaBottomBar(
 
             NavigationBarItem(
                 selected = selectedTab == 3,
-                onClick = { onTabSelected(3) },
+                onClick = { performHaptic(view); onTabSelected(3) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
@@ -1040,20 +1075,8 @@ private fun formatDate(millis: Long): String {
     ).format(Date(millis))
 }
 
-private fun vibrate(context: Context) {
-    val vibrator = ContextCompat.getSystemService(
-        context,
-        Vibrator::class.java
-    ) ?: return
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        vibrator.vibrate(
-            VibrationEffect.createPredefined(
-                VibrationEffect.EFFECT_CLICK
-            )
-        )
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(18)
-    }
+private fun performHaptic(view: android.view.View) {
+    view.performHapticFeedback(
+        android.view.HapticFeedbackConstants.CONTEXT_CLICK
+    )
 }
