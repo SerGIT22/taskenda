@@ -7,6 +7,8 @@ class TaskRepository(private val dao: TaskDao) {
 
     suspend fun add(task: Task) = dao.insert(task)
     suspend fun update(task: Task) = dao.update(task)
+    suspend fun setCompleted(id: Long, completed: Boolean) =
+        dao.setCompleted(id, completed)
     suspend fun delete(task: Task) = dao.delete(task)
     suspend fun get(id: Long) = dao.get(id)
     suspend fun moveTasksToList(fromList: String, toList: String) =
