@@ -1,10 +1,7 @@
 package com.sergio.taskenda
 
-import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -39,12 +36,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -88,11 +85,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.sergio.taskenda.data.Task
@@ -566,7 +563,6 @@ private fun TaskRow(
     onDelete: () -> Unit
 ) {
 
-    val context = LocalContext.current
     var menuExpanded by remember(task.id) {
         mutableStateOf(false)
     }
@@ -596,10 +592,7 @@ private fun TaskRow(
         ) {
             TaskCheckbox(
                 checked = task.completed,
-                onCheckedChange = {
-                    vibrate(context)
-                    onToggleComplete()
-                }
+                onCheckedChange = onToggleComplete
             )
 
             Spacer(Modifier.width(8.dp))
@@ -729,42 +722,41 @@ private fun TaskCheckbox(
     checked: Boolean,
     onCheckedChange: () -> Unit
 ) {
-    IconButton(
-        onClick = onCheckedChange,
-        modifier = Modifier.size(48.dp)
+
+    Surface(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .combinedClickable(onClick = onCheckedChange),
+        shape = CircleShape,
+        color = if (checked) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            Color.Transparent
+        },
+        border = if (checked) {
+            null
+        } else {
+            BorderStroke(
+                width = 2.dp,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
     ) {
-        Surface(
-            modifier = Modifier.size(44.dp),
-            shape = CircleShape,
-            color = if (checked) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                Color.Transparent
-            },
-            border = if (checked) {
-                null
-            } else {
-                BorderStroke(
-                    width = 2.dp,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                AnimatedContent(
-                    targetState = checked,
-                    label = "task_checkbox"
-                ) { isChecked ->
-                    if (isChecked) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Completada",
-                            modifier = Modifier.size(25.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Spacer(Modifier.size(1.dp))
-                    }
+        Box(contentAlignment = Alignment.Center) {
+            AnimatedContent(
+                targetState = checked,
+                label = "task_checkbox"
+            ) { isChecked ->
+                if (isChecked) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Completada",
+                        modifier = Modifier.size(25.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Spacer(Modifier.size(1.dp))
                 }
             }
         }
@@ -1230,6 +1222,7 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -1257,7 +1250,11 @@ private fun TaskendaBottomBar(
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = Icons.Default.CalendarToday,
+                        imageVector = if (selectedTab == 0) {
+                            Icons.Default.CheckCircle
+                        } else {
+                            Icons.Outlined.CheckCircle
+                        },
                         contentDescription = "Hoy"
                     )
                 },
@@ -1273,7 +1270,11 @@ private fun TaskendaBottomBar(
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = Icons.Default.TaskAlt,
+                        imageVector = if (selectedTab == 1) {
+                            Icons.Default.TaskAlt
+                        } else {
+                            Icons.Outlined.CheckCircle
+                        },
                         contentDescription = "Tareas"
                     )
                 },
@@ -1289,7 +1290,11 @@ private fun TaskendaBottomBar(
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = Icons.Default.Star,
+                        imageVector = if (selectedTab == 2) {
+                            Icons.Default.Star
+                        } else {
+                            Icons.Outlined.StarBorder
+                        },
                         contentDescription = "Importantes"
                     )
                 },
@@ -1305,7 +1310,11 @@ private fun TaskendaBottomBar(
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = if (selectedTab == 3) {
+                            Icons.Default.Check
+                        } else {
+                            Icons.Default.CheckCircle
+                        },
                         contentDescription = "Completadas"
                     )
                 },
@@ -1325,20 +1334,3 @@ private fun formatDate(millis: Long): String {
     ).format(Date(millis))
 }
 
-private fun vibrate(context: Context) {
-    val vibrator = ContextCompat.getSystemService(
-        context,
-        Vibrator::class.java
-    ) ?: return
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        vibrator.vibrate(
-            VibrationEffect.createPredefined(
-                VibrationEffect.EFFECT_CLICK
-            )
-        )
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(18)
-    }
-}
