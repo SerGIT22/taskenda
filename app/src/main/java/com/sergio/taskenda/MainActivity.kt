@@ -93,12 +93,73 @@ import androidx.room.Room
 import com.sergio.taskenda.data.Task
 import com.sergio.taskenda.data.TaskDatabase
 import com.sergio.taskenda.data.TaskRepository
-import com.sergio.taskenda.data.TaskListStore
 import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
+import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private class LocalTaskListStore(context: android.content.Context) {
+    companion object {
+        const val DEFAULT_LIST = "Mis tareas"
+        private const val PREFS_NAME = "taskenda_lists"
+        private const val KEY_LISTS = "lists"
+    }
+
+    private val preferences = context.applicationContext
+        .getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+
+    fun getLists(): List<String> {
+        val raw = preferences.getString(KEY_LISTS, null)
+        if (raw.isNullOrBlank()) return listOf(DEFAULT_LIST)
+
+        return try {
+            val json = JSONArray(raw)
+            val result = mutableListOf<String>()
+            for (index in 0 until json.length()) {
+                val name = json.optString(index).trim()
+                if (name.isNotEmpty() && result.none { it.equals(name, ignoreCase = true) }) {
+                    result.add(name)
+                }
+            }
+            if (result.none { it.equals(DEFAULT_LIST, ignoreCase = true) }) {
+                result.add(0, DEFAULT_LIST)
+            }
+            result
+        } catch (_: Exception) {
+            listOf(DEFAULT_LIST)
+        }
+    }
+
+    fun addList(name: String): Boolean {
+        val clean = name.trim()
+        if (clean.isEmpty()) return false
+        val current = getLists().toMutableList()
+        if (current.any { it.equals(clean, ignoreCase = true) }) return false
+        current.add(clean)
+        save(current)
+        return true
+    }
+
+    fun removeList(name: String): Boolean {
+        if (name.equals(DEFAULT_LIST, ignoreCase = true)) return false
+        val current = getLists().toMutableList()
+        val removed = current.removeAll { it.equals(name.trim(), ignoreCase = true) }
+        if (!removed) return false
+        if (current.none { it.equals(DEFAULT_LIST, ignoreCase = true) }) {
+            current.add(0, DEFAULT_LIST)
+        }
+        save(current)
+        return true
+    }
+
+    private fun save(lists: List<String>) {
+        val json = JSONArray()
+        lists.forEach { json.put(it) }
+        preferences.edit().putString(KEY_LISTS, json.toString()).apply()
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -160,9 +221,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
     }
 
     val context = LocalContext.current
-    val listStore = remember { TaskListStore(context.applicationContext) }
+    val listStore = remember { LocalTaskListStore(context.applicationContext) }
     var lists by remember { mutableStateOf(listStore.getLists()) }
-    var selectedList by remember { mutableStateOf(TaskListStore.DEFAULT_LIST) }
+    var selectedList by remember { mutableStateOf(LocalTaskListStore.DEFAULT_LIST) }
     var listSheetVisible by remember { mutableStateOf(false) }
 
     // Calculamos cada grupo una sola vez cuando cambia la lista de tareas.
@@ -399,9 +460,13 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 }
             },
             onRename = { oldName, newName ->
-                if (oldName != TaskListStore.DEFAULT_LIST && newName.isNotBlank() &&
+                if (oldName != LocalTaskListStore.DEFAULT_LIST && newName.isNotBlank() &&
                     lists.none { it.equals(newName.trim(), ignoreCase = true) }) {
-                    vm.renameList(oldName, newName.trim())
+                    vm.tasks.value
+                        .filter { it.listName.equals(oldName, ignoreCase = true) }
+                        .forEach { task ->
+                            vm.update(task.copy(listName = newName.trim()))
+                        }
                     if (listStore.removeList(oldName)) {
                         listStore.addList(newName.trim())
                         lists = listStore.getLists()
@@ -410,11 +475,15 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 }
             },
             onDelete = { name ->
-                if (name != TaskListStore.DEFAULT_LIST) {
-                    vm.moveTasksToList(name, TaskListStore.DEFAULT_LIST)
+                if (name != LocalTaskListStore.DEFAULT_LIST) {
+                    vm.tasks.value
+                        .filter { it.listName.equals(name, ignoreCase = true) }
+                        .forEach { task ->
+                            vm.update(task.copy(listName = LocalTaskListStore.DEFAULT_LIST))
+                        }
                     listStore.removeList(name)
                     lists = listStore.getLists()
-                    if (selectedList == name) selectedList = TaskListStore.DEFAULT_LIST
+                    if (selectedList == name) selectedList = LocalTaskListStore.DEFAULT_LIST
                 }
             },
             onDismiss = { listSheetVisible = false }
@@ -851,7 +920,7 @@ private fun TaskEditorSheet(
     }
 
     var listName by remember(task?.id) {
-        mutableStateOf(task?.listName ?: TaskListStore.DEFAULT_LIST)
+        mutableStateOf(task?.listName ?: LocalTaskListStore.DEFAULT_LIST)
     }
 
     var listMenuExpanded by remember { mutableStateOf(false) }
@@ -1142,7 +1211,7 @@ private fun TaskListSheet(
                         }
                     }
 
-                    if (name != TaskListStore.DEFAULT_LIST) {
+                    if (name != LocalTaskListStore.DEFAULT_LIST) {
                         IconButton(
                             onClick = {
                                 performHaptic(view)
@@ -1221,7 +1290,7 @@ private fun TaskListSheet(
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
             title = { Text("Eliminar lista") },
-            text = { Text("Las tareas de «$name» pasarán a «${TaskListStore.DEFAULT_LIST}». No se eliminarán.") },
+            text = { Text("Las tareas de «$name» pasarán a «${LocalTaskListStore.DEFAULT_LIST}». No se eliminarán.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1403,4 +1472,3 @@ private fun performHaptic(view: android.view.View) {
         android.view.HapticFeedbackConstants.CONTEXT_CLICK
     )
 }
-
