@@ -93,6 +93,7 @@ import androidx.room.Room
 import com.sergio.taskenda.data.Task
 import com.sergio.taskenda.data.TaskDatabase
 import com.sergio.taskenda.data.TaskRepository
+import com.sergio.taskenda.data.TaskListStore
 import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
 import org.json.JSONArray
@@ -192,8 +193,12 @@ class MainActivity : ComponentActivity() {
             }
 
             MaterialTheme(colorScheme = colorScheme) {
+                val listStore = remember {
+                    TaskListStore(applicationContext)
+                }
+
                 val vm: TaskViewModel = viewModel(
-                    factory = TaskViewModelFactory(repository)
+                    factory = TaskViewModelFactory(repository, listStore)
                 )
 
                 TaskendaApp(vm)
