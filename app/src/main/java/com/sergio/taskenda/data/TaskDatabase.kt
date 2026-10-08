@@ -6,8 +6,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Task::class],
-    version = 2,
+    entities = [Task::class, Subtask::class],
+    version = 3,
     exportSchema = false
 )
 abstract class TaskDatabase : RoomDatabase() {
@@ -30,15 +30,11 @@ abstract class TaskDatabase : RoomDatabase() {
                 }
 
                 if (!columns.contains("dueDate")) {
-                    database.execSQL(
-                        "ALTER TABLE tasks ADD COLUMN dueDate INTEGER"
-                    )
+                    database.execSQL("ALTER TABLE tasks ADD COLUMN dueDate INTEGER")
                 }
 
                 if (!columns.contains("dueTime")) {
-                    database.execSQL(
-                        "ALTER TABLE tasks ADD COLUMN dueTime TEXT"
-                    )
+                    database.execSQL("ALTER TABLE tasks ADD COLUMN dueTime TEXT")
                 }
 
                 if (!columns.contains("listName")) {
@@ -52,6 +48,28 @@ abstract class TaskDatabase : RoomDatabase() {
                         "ALTER TABLE tasks ADD COLUMN createdAt INTEGER NOT NULL DEFAULT 0"
                     )
                 }
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS subtasks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        completed INTEGER NOT NULL DEFAULT 0,
+                        position INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_subtasks_taskId ON subtasks(taskId)"
+                )
             }
         }
     }
