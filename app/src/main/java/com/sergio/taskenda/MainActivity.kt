@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
@@ -59,8 +60,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -592,7 +591,12 @@ private fun TaskRow(
         ) {
             TaskCheckbox(
                 checked = task.completed,
-                onCheckedChange = onToggleComplete
+                onCheckedChange = {
+                    LocalView.current.performHapticFeedback(
+                        android.view.HapticFeedbackConstants.CONTEXT_CLICK
+                    )
+                    onToggleComplete()
+                }
             )
 
             Spacer(Modifier.width(8.dp))
@@ -1222,6 +1226,19 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
+    val labels = listOf(
+        "Hoy",
+        "Tareas",
+        "Importantes",
+        "Completadas"
+    )
+
+    val icons = listOf(
+        Icons.Default.CalendarToday,
+        Icons.Default.TaskAlt,
+        Icons.Default.Star,
+        Icons.Default.CheckCircle
+    )
 
     Surface(
         modifier = Modifier
@@ -1241,88 +1258,69 @@ private fun TaskendaBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NavigationBarItem(
-                selected = selectedTab == 0,
-                onClick = { onTabSelected(0) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = if (selectedTab == 0) {
-                            Icons.Default.CheckCircle
-                        } else {
-                            Icons.Outlined.CheckCircle
-                        },
-                        contentDescription = "Hoy"
-                    )
-                },
-                label = { Text("Hoy", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
+            labels.indices.forEach { index ->
+                val selected = selectedTab == index
 
-            NavigationBarItem(
-                selected = selectedTab == 1,
-                onClick = { onTabSelected(1) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = if (selectedTab == 1) {
-                            Icons.Default.TaskAlt
-                        } else {
-                            Icons.Outlined.CheckCircle
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(60.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .clickable {
+                            if (!selected) {
+                                LocalView.current.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.CONTEXT_CLICK
+                                )
+                                onTabSelected(index)
+                            }
                         },
-                        contentDescription = "Tareas"
-                    )
-                },
-                label = { Text("Tareas", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    Color.Transparent
+                                }
+                            )
+                            .padding(
+                                horizontal = if (selected) 14.dp else 10.dp,
+                                vertical = 9.dp
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = icons[index],
+                            contentDescription = labels[index],
+                            modifier = Modifier.size(24.dp),
+                            tint = if (selected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
 
-            NavigationBarItem(
-                selected = selectedTab == 2,
-                onClick = { onTabSelected(2) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = if (selectedTab == 2) {
-                            Icons.Default.Star
-                        } else {
-                            Icons.Outlined.StarBorder
-                        },
-                        contentDescription = "Importantes"
-                    )
-                },
-                label = { Text("Importantes", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
-
-            NavigationBarItem(
-                selected = selectedTab == 3,
-                onClick = { onTabSelected(3) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = if (selectedTab == 3) {
-                            Icons.Default.Check
-                        } else {
-                            Icons.Default.CheckCircle
-                        },
-                        contentDescription = "Completadas"
-                    )
-                },
-                label = { Text("Completadas", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
+                        if (selected) {
+                            Spacer(Modifier.width(7.dp))
+                            Text(
+                                text = labels[index],
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
