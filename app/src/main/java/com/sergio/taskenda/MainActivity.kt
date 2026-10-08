@@ -1,7 +1,10 @@
 package com.sergio.taskenda
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -13,7 +16,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,13 +38,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -58,8 +57,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -84,17 +86,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.sergio.taskenda.data.Task
 import com.sergio.taskenda.data.TaskDatabase
 import com.sergio.taskenda.data.TaskRepository
-import com.sergio.taskenda.data.TaskListStore
 import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
 import java.text.SimpleDateFormat
@@ -110,10 +111,7 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             TaskDatabase::class.java,
             "taskenda.db"
-        )
-            .addMigrations(TaskDatabase.MIGRATION_1_2)
-            .fallbackToDestructiveMigration()
-            .build()
+        ).build()
 
         val repository = TaskRepository(database.taskDao())
 
@@ -131,10 +129,9 @@ class MainActivity : ComponentActivity() {
                 if (darkTheme) darkColorScheme() else lightColorScheme()
             }
 
-            MaterialTheme(colorScheme = colorScheme) {
-                val listStore = remember { TaskListStore(context) }
+            MaterialExpressiveTheme(colorScheme = colorScheme) {
                 val vm: TaskViewModel = viewModel(
-                    factory = TaskViewModelFactory(repository, listStore)
+                    factory = TaskViewModelFactory(repository)
                 )
 
                 TaskendaApp(vm)
@@ -147,10 +144,6 @@ class MainActivity : ComponentActivity() {
 private fun TaskendaApp(vm: TaskViewModel) {
 
     val tasks by vm.tasks.collectAsState()
-    val taskLists by vm.lists.collectAsState()
-
-    var selectedList by remember { mutableStateOf(vm.currentList) }
-    var listSheetVisible by remember { mutableStateOf(false) }
 
     var selectedTab by remember {
         mutableIntStateOf(0)
@@ -164,8 +157,14 @@ private fun TaskendaApp(vm: TaskViewModel) {
         mutableStateOf<Task?>(null)
     }
 
-    val listTasks = remember(tasks, selectedList) {
-        tasks.filter { it.listName == selectedList }
+    val visibleTasks = remember(tasks, selectedTab) {
+        when (selectedTab) {
+            0 -> tasks.filter { !it.completed }
+            1 -> tasks.filter { !it.completed }
+            2 -> tasks.filter { !it.completed && it.important }
+            3 -> tasks.filter { it.completed }
+            else -> emptyList()
+        }
     }
 
     val headerTitle = when (selectedTab) {
@@ -252,14 +251,12 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         else -> ""
                     },
                     taskCount = when (tab) {
-                        0 -> listTasks.count { !it.completed }
-                        1 -> listTasks.count { !it.completed }
-                        2 -> listTasks.count { !it.completed && it.important }
-                        3 -> listTasks.count { it.completed }
+                        0 -> tasks.count { !it.completed }
+                        1 -> tasks.count { !it.completed }
+                        2 -> tasks.count { !it.completed && it.important }
+                        3 -> tasks.count { it.completed }
                         else -> 0
-                    },
-                    listName = selectedList,
-                    onListClick = { listSheetVisible = true }
+                    }
                 )
             }
 
@@ -279,10 +276,10 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 ) { tab ->
 
                     val tabTasks = when (tab) {
-                        0 -> listTasks.filter { !it.completed }
-                        1 -> listTasks.filter { !it.completed }
-                        2 -> listTasks.filter { !it.completed && it.important }
-                        3 -> listTasks.filter { it.completed }
+                        0 -> tasks.filter { !it.completed }
+                        1 -> tasks.filter { !it.completed }
+                        2 -> tasks.filter { !it.completed && it.important }
+                        3 -> tasks.filter { it.completed }
                         else -> emptyList()
                     }
 
@@ -333,41 +330,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
         }
     }
 
-    if (listSheetVisible) {
-        TaskListManagerSheet(
-            lists = taskLists,
-            selectedList = selectedList,
-            onSelectList = { name ->
-                selectedList = name
-                vm.selectList(name)
-                listSheetVisible = false
-            },
-            onCreateList = { name ->
-                val created = vm.createList(name)
-                if (created != null) {
-                    selectedList = created
-                    vm.selectList(created)
-                }
-            },
-            onRenameList = { oldName, newName ->
-                vm.renameList(oldName, newName)
-                if (selectedList == oldName) selectedList = newName
-            },
-            onDeleteList = { name ->
-                vm.deleteList(name)
-                if (selectedList == name) {
-                    selectedList = vm.currentList
-                }
-            },
-            onDismiss = { listSheetVisible = false }
-        )
-    }
-
     if (editorVisible) {
         TaskEditorSheet(
             task = editingTask,
-            lists = taskLists,
-            defaultList = selectedList,
             onDismiss = {
                 editorVisible = false
                 editingTask = null
@@ -378,8 +343,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         title = updatedTask.title,
                         notes = updatedTask.notes,
                         important = updatedTask.important,
-                        dueDate = updatedTask.dueDate,
-                        listName = updatedTask.listName
+                        dueDate = updatedTask.dueDate
                     )
                 } else {
                     vm.update(updatedTask)
@@ -396,9 +360,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
 private fun TaskendaHeader(
     title: String,
     subtitle: String,
-    taskCount: Int,
-    listName: String,
-    onListClick: () -> Unit
+    taskCount: Int
 ) {
 
     Row(
@@ -432,27 +394,6 @@ private fun TaskendaHeader(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(Modifier.height(4.dp))
-
-            TextButton(
-                onClick = onListClick,
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
-            ) {
-                Text(
-                    text = listName,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.width(2.dp))
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Cambiar lista",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
 
         Spacer(Modifier.width(12.dp))
@@ -562,6 +503,7 @@ private fun TaskRow(
     onDelete: () -> Unit
 ) {
 
+    val context = LocalContext.current
     var menuExpanded by remember(task.id) {
         mutableStateOf(false)
     }
@@ -592,9 +534,7 @@ private fun TaskRow(
             TaskCheckbox(
                 checked = task.completed,
                 onCheckedChange = {
-                    LocalView.current.performHapticFeedback(
-                        android.view.HapticFeedbackConstants.CONTEXT_CLICK
-                    )
+                    vibrate(context)
                     onToggleComplete()
                 }
             )
@@ -771,8 +711,6 @@ private fun TaskCheckbox(
 @Composable
 private fun TaskEditorSheet(
     task: Task?,
-    lists: List<String>,
-    defaultList: String,
     onDismiss: () -> Unit,
     onSave: (Task) -> Unit
 ) {
@@ -792,12 +730,6 @@ private fun TaskEditorSheet(
     var dueDate by remember(task?.id) {
         mutableStateOf(task?.dueDate)
     }
-
-    var listName by remember(task?.id, defaultList) {
-        mutableStateOf(task?.listName ?: defaultList)
-    }
-
-    var listMenuExpanded by remember { mutableStateOf(false) }
 
     var datePickerVisible by remember {
         mutableStateOf(false)
@@ -847,48 +779,6 @@ private fun TaskEditorSheet(
                 label = { Text("Notas") },
                 placeholder = { Text("Añade información opcional") }
             )
-
-            Box {
-                OutlinedButton(
-                    onClick = { listMenuExpanded = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.TaskAlt,
-                        contentDescription = null
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = listName,
-                        modifier = Modifier.weight(1f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = null
-                    )
-                }
-
-                androidx.compose.material3.DropdownMenu(
-                    expanded = listMenuExpanded,
-                    onDismissRequest = { listMenuExpanded = false }
-                ) {
-                    lists.forEach { name ->
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            trailingIcon = if (name == listName) {
-                                { Icon(Icons.Default.Check, contentDescription = null) }
-                            } else null,
-                            onClick = {
-                                listName = name
-                                listMenuExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
 
             OutlinedButton(
                 onClick = { datePickerVisible = true },
@@ -958,14 +848,12 @@ private fun TaskEditorSheet(
                             title = cleanTitle,
                             notes = notes.trim(),
                             important = important,
-                            dueDate = dueDate,
-                            listName = listName
+                            dueDate = dueDate
                         ) ?: Task(
                             title = cleanTitle,
                             notes = notes.trim(),
                             important = important,
-                            dueDate = dueDate,
-                            listName = listName
+                            dueDate = dueDate
                         )
                     )
                 },
@@ -993,194 +881,6 @@ private fun TaskEditorSheet(
             }
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TaskListManagerSheet(
-    lists: List<String>,
-    selectedList: String,
-    onSelectList: (String) -> Unit,
-    onCreateList: (String) -> Unit,
-    onRenameList: (String, String) -> Unit,
-    onDeleteList: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var createDialog by remember { mutableStateOf(false) }
-    var renameTarget by remember { mutableStateOf<String?>(null) }
-    var deleteTarget by remember { mutableStateOf<String?>(null) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Mis listas",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Organiza tus tareas como quieras",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = { createDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Nueva lista")
-                }
-            }
-
-            Spacer(Modifier.height(4.dp))
-
-            lists.forEach { name ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (name == selectedList) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainer
-                        }
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.TaskAlt,
-                            contentDescription = null,
-                            tint = if (name == selectedList) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = name,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { onSelectList(name) },
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (name == selectedList) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (name == selectedList) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (name == selectedList) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Seleccionada",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        IconButton(onClick = { renameTarget = name }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Renombrar")
-                        }
-                        if (name != TaskListStore.DEFAULT_LIST) {
-                            IconButton(onClick = { deleteTarget = name }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Eliminar")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (createDialog) {
-        ListNameDialog(
-            title = "Nueva lista",
-            confirmText = "Crear",
-            onDismiss = { createDialog = false },
-            onConfirm = {
-                onCreateList(it)
-                createDialog = false
-            }
-        )
-    }
-
-    renameTarget?.let { oldName ->
-        ListNameDialog(
-            title = "Renombrar lista",
-            initialName = oldName,
-            confirmText = "Guardar",
-            onDismiss = { renameTarget = null },
-            onConfirm = {
-                onRenameList(oldName, it)
-                renameTarget = null
-            }
-        )
-    }
-
-    deleteTarget?.let { name ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text("Eliminar lista") },
-            text = { Text("Las tareas de «$name» pasarán a «${TaskListStore.DEFAULT_LIST}».") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDeleteList(name)
-                    deleteTarget = null
-                }) { Text("Eliminar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("Cancelar") }
-            }
-        )
-    }
-}
-
-@Composable
-private fun ListNameDialog(
-    title: String,
-    initialName: String = "",
-    confirmText: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var name by remember(initialName) { mutableStateOf(initialName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Nombre") }
-            )
-        },
-        confirmButton = {
-            TextButton(
-                enabled = name.trim().isNotBlank(),
-                onClick = { onConfirm(name.trim()) }
-            ) { Text(confirmText) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
-        }
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1226,19 +926,6 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
-    val labels = listOf(
-        "Hoy",
-        "Tareas",
-        "Importantes",
-        "Completadas"
-    )
-
-    val icons = listOf(
-        Icons.Default.CalendarToday,
-        Icons.Default.TaskAlt,
-        Icons.Default.Star,
-        Icons.Default.CheckCircle
-    )
 
     Surface(
         modifier = Modifier
@@ -1258,69 +945,88 @@ private fun TaskendaBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            labels.indices.forEach { index ->
-                val selected = selectedTab == index
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(60.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .clickable {
-                            if (!selected) {
-                                LocalView.current.performHapticFeedback(
-                                    android.view.HapticFeedbackConstants.CONTEXT_CLICK
-                                )
-                                onTabSelected(index)
-                            }
+            NavigationBarItem(
+                selected = selectedTab == 0,
+                onClick = { onTabSelected(0) },
+                modifier = Modifier.weight(1f),
+                icon = {
+                    Icon(
+                        imageVector = if (selectedTab == 0) {
+                            Icons.Default.CheckCircle
+                        } else {
+                            Icons.Outlined.CheckCircle
                         },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.primaryContainer
-                                } else {
-                                    Color.Transparent
-                                }
-                            )
-                            .padding(
-                                horizontal = if (selected) 14.dp else 10.dp,
-                                vertical = 9.dp
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = icons[index],
-                            contentDescription = labels[index],
-                            modifier = Modifier.size(24.dp),
-                            tint = if (selected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
+                        contentDescription = "Hoy"
+                    )
+                },
+                label = { Text("Hoy", maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
 
-                        if (selected) {
-                            Spacer(Modifier.width(7.dp))
-                            Text(
-                                text = labels[index],
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-            }
+            NavigationBarItem(
+                selected = selectedTab == 1,
+                onClick = { onTabSelected(1) },
+                modifier = Modifier.weight(1f),
+                icon = {
+                    Icon(
+                        imageVector = if (selectedTab == 1) {
+                            Icons.Default.TaskAlt
+                        } else {
+                            Icons.Outlined.CheckCircle
+                        },
+                        contentDescription = "Tareas"
+                    )
+                },
+                label = { Text("Tareas", maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+
+            NavigationBarItem(
+                selected = selectedTab == 2,
+                onClick = { onTabSelected(2) },
+                modifier = Modifier.weight(1f),
+                icon = {
+                    Icon(
+                        imageVector = if (selectedTab == 2) {
+                            Icons.Default.Star
+                        } else {
+                            Icons.Outlined.StarBorder
+                        },
+                        contentDescription = "Importantes"
+                    )
+                },
+                label = { Text("Importantes", maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+
+            NavigationBarItem(
+                selected = selectedTab == 3,
+                onClick = { onTabSelected(3) },
+                modifier = Modifier.weight(1f),
+                icon = {
+                    Icon(
+                        imageVector = if (selectedTab == 3) {
+                            Icons.Default.Check
+                        } else {
+                            Icons.Default.CheckCircle
+                        },
+                        contentDescription = "Completadas"
+                    )
+                },
+                label = { Text("Completadas", maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
         }
     }
 }
@@ -1332,3 +1038,20 @@ private fun formatDate(millis: Long): String {
     ).format(Date(millis))
 }
 
+private fun vibrate(context: Context) {
+    val vibrator = ContextCompat.getSystemService(
+        context,
+        Vibrator::class.java
+    ) ?: return
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        vibrator.vibrate(
+            VibrationEffect.createPredefined(
+                VibrationEffect.EFFECT_CLICK
+            )
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(18)
+    }
+}
