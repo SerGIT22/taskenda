@@ -1,17 +1,22 @@
 package com.sergio.taskenda
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,8 +31,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -36,13 +39,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -86,86 +88,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.sergio.taskenda.data.Task
-import com.sergio.taskenda.data.Subtask
 import com.sergio.taskenda.data.TaskDatabase
 import com.sergio.taskenda.data.TaskRepository
 import com.sergio.taskenda.data.TaskListStore
 import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
-import org.json.JSONArray
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
-private class LocalTaskListStore(context: android.content.Context) {
-    companion object {
-        const val DEFAULT_LIST = "Mis tareas"
-        private const val PREFS_NAME = "taskenda_lists"
-        private const val KEY_LISTS = "lists"
-    }
-
-    private val preferences = context.applicationContext
-        .getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-
-    fun getLists(): List<String> {
-        val raw = preferences.getString(KEY_LISTS, null)
-        if (raw.isNullOrBlank()) return listOf(DEFAULT_LIST)
-
-        return try {
-            val json = JSONArray(raw)
-            val result = mutableListOf<String>()
-            for (index in 0 until json.length()) {
-                val name = json.optString(index).trim()
-                if (name.isNotEmpty() && result.none { it.equals(name, ignoreCase = true) }) {
-                    result.add(name)
-                }
-            }
-            if (result.none { it.equals(DEFAULT_LIST, ignoreCase = true) }) {
-                result.add(0, DEFAULT_LIST)
-            }
-            result
-        } catch (_: Exception) {
-            listOf(DEFAULT_LIST)
-        }
-    }
-
-    fun addList(name: String): Boolean {
-        val clean = name.trim()
-        if (clean.isEmpty()) return false
-        val current = getLists().toMutableList()
-        if (current.any { it.equals(clean, ignoreCase = true) }) return false
-        current.add(clean)
-        save(current)
-        return true
-    }
-
-    fun removeList(name: String): Boolean {
-        if (name.equals(DEFAULT_LIST, ignoreCase = true)) return false
-        val current = getLists().toMutableList()
-        val removed = current.removeAll { it.equals(name.trim(), ignoreCase = true) }
-        if (!removed) return false
-        if (current.none { it.equals(DEFAULT_LIST, ignoreCase = true) }) {
-            current.add(0, DEFAULT_LIST)
-        }
-        save(current)
-        return true
-    }
-
-    private fun save(lists: List<String>) {
-        val json = JSONArray()
-        lists.forEach { json.put(it) }
-        preferences.edit().putString(KEY_LISTS, json.toString()).apply()
-    }
-}
 
 class MainActivity : ComponentActivity() {
 
@@ -177,10 +115,7 @@ class MainActivity : ComponentActivity() {
             TaskDatabase::class.java,
             "taskenda.db"
         )
-            .addMigrations(
-                TaskDatabase.MIGRATION_1_2,
-                TaskDatabase.MIGRATION_2_3
-            )
+            .addMigrations(TaskDatabase.MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -201,10 +136,7 @@ class MainActivity : ComponentActivity() {
             }
 
             MaterialTheme(colorScheme = colorScheme) {
-                val listStore = remember {
-                    TaskListStore(applicationContext)
-                }
-
+                val listStore = remember { TaskListStore(context) }
                 val vm: TaskViewModel = viewModel(
                     factory = TaskViewModelFactory(repository, listStore)
                 )
@@ -218,13 +150,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun TaskendaApp(vm: TaskViewModel) {
 
-    val view = LocalView.current
     val tasks by vm.tasks.collectAsState()
-    val subtasks by vm.subtasks.collectAsState()
+    val taskLists by vm.lists.collectAsState()
 
-    val subtasksByTask = remember(subtasks) {
-        subtasks.groupBy { it.taskId }
-    }
+    var selectedList by remember { mutableStateOf(vm.currentList) }
+    var listSheetVisible by remember { mutableStateOf(false) }
 
     var selectedTab by remember {
         mutableIntStateOf(0)
@@ -238,49 +168,8 @@ private fun TaskendaApp(vm: TaskViewModel) {
         mutableStateOf<Task?>(null)
     }
 
-    val context = LocalContext.current
-    val listStore = remember { LocalTaskListStore(context.applicationContext) }
-    var lists by remember { mutableStateOf(listStore.getLists()) }
-    var selectedList by remember { mutableStateOf(LocalTaskListStore.DEFAULT_LIST) }
-    var listSheetVisible by remember { mutableStateOf(false) }
-
-    // Calculamos cada grupo una sola vez cuando cambia la lista de tareas.
-    // Así evitamos recorrer toda la base de datos varias veces durante una creación.
     val listTasks = remember(tasks, selectedList) {
         tasks.filter { it.listName == selectedList }
-    }
-    val pendingTasks = remember(listTasks) {
-        listTasks.filter { !it.completed }
-    }
-    val completedTasks = remember(listTasks) {
-        listTasks.filter { it.completed }
-    }
-    val importantTasks = remember(listTasks) {
-        listTasks.filter { !it.completed && it.important }
-    }
-
-    // "Hoy" incluye tareas pendientes atrasadas y las que vencen hoy.
-    // Las tareas con fecha futura (por ejemplo, mañana) solo aparecen en "Tareas".
-    val todayTasks = remember(pendingTasks) {
-        val tomorrowStart = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            add(Calendar.DAY_OF_YEAR, 1)
-        }.timeInMillis
-
-        pendingTasks.filter { task ->
-            task.dueDate != null && task.dueDate < tomorrowStart
-        }
-    }
-
-    val visibleTasks = when (selectedTab) {
-        0 -> todayTasks
-        1 -> pendingTasks
-        2 -> importantTasks
-        3 -> completedTasks
-        else -> emptyList()
     }
 
     val headerTitle = when (selectedTab) {
@@ -300,10 +189,10 @@ private fun TaskendaApp(vm: TaskViewModel) {
     }
 
     val headerCount = when (selectedTab) {
-        0 -> todayTasks.size
-        1 -> pendingTasks.size
-        2 -> importantTasks.size
-        3 -> completedTasks.size
+        0 -> listTasks.count { !it.completed && isTodayOrOverdue(it.dueDate) }
+        1 -> listTasks.count { !it.completed }
+        2 -> listTasks.count { !it.completed && it.important }
+        3 -> listTasks.count { it.completed }
         else -> 0
     }
 
@@ -312,7 +201,6 @@ private fun TaskendaApp(vm: TaskViewModel) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    performHaptic(view)
                     editingTask = null
                     editorVisible = true
                 },
@@ -368,16 +256,14 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         else -> ""
                     },
                     taskCount = when (tab) {
-                        0, 1 -> pendingTasks.size
-                        2 -> importantTasks.size
-                        3 -> completedTasks.size
+                        0 -> listTasks.count { !it.completed }
+                        1 -> listTasks.count { !it.completed }
+                        2 -> listTasks.count { !it.completed && it.important }
+                        3 -> listTasks.count { it.completed }
                         else -> 0
                     },
-                    selectedList = selectedList,
-                    onListClick = {
-                        performHaptic(view)
-                        listSheetVisible = true
-                    }
+                    listName = selectedList,
+                    onListClick = { listSheetVisible = true }
                 )
             }
 
@@ -397,10 +283,12 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 ) { tab ->
 
                     val tabTasks = when (tab) {
-                        0 -> todayTasks
-                        1 -> pendingTasks
-                        2 -> importantTasks
-                        3 -> completedTasks
+                        0 -> listTasks.filter {
+                            !it.completed && isTodayOrOverdue(it.dueDate)
+                        }
+                        1 -> listTasks.filter { !it.completed }
+                        2 -> listTasks.filter { !it.completed && it.important }
+                        3 -> listTasks.filter { it.completed }
                         else -> emptyList()
                     }
 
@@ -408,7 +296,6 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         EmptyTasks(
                             selectedTab = tab,
                             onCreate = {
-                                performHaptic(view)
                                 editingTask = null
                                 editorVisible = true
                             }
@@ -430,7 +317,6 @@ private fun TaskendaApp(vm: TaskViewModel) {
                             ) { task ->
                                 TaskRow(
                                     task = task,
-                                    subtasks = subtasksByTask[task.id].orEmpty(),
                                     onToggleComplete = {
                                         vm.toggle(task)
                                     },
@@ -453,69 +339,61 @@ private fun TaskendaApp(vm: TaskViewModel) {
         }
     }
 
+    if (listSheetVisible) {
+        TaskListManagerSheet(
+            lists = taskLists,
+            selectedList = selectedList,
+            onSelectList = { name ->
+                selectedList = name
+                vm.selectList(name)
+                listSheetVisible = false
+            },
+            onCreateList = { name ->
+                val created = vm.createList(name)
+                if (created != null) {
+                    selectedList = created
+                    vm.selectList(created)
+                }
+            },
+            onRenameList = { oldName, newName ->
+                vm.renameList(oldName, newName)
+                if (selectedList == oldName) selectedList = newName
+            },
+            onDeleteList = { name ->
+                vm.deleteList(name)
+                if (selectedList == name) {
+                    selectedList = vm.currentList
+                }
+            },
+            onDismiss = { listSheetVisible = false }
+        )
+    }
+
     if (editorVisible) {
         TaskEditorSheet(
             task = editingTask,
-            subtasks = editingTask?.let { subtasksByTask[it.id].orEmpty() } ?: emptyList(),
-            lists = lists,
-            onManageLists = {
-                listSheetVisible = true
-            },
+            lists = taskLists,
+            defaultList = selectedList,
             onDismiss = {
                 editorVisible = false
                 editingTask = null
             },
-            onSave = { updatedTask, updatedSubtasks ->
-                vm.save(updatedTask, updatedSubtasks)
+            onSave = { updatedTask ->
+                if (editingTask == null) {
+                    vm.add(
+                        title = updatedTask.title,
+                        notes = updatedTask.notes,
+                        important = updatedTask.important,
+                        dueDate = updatedTask.dueDate,
+                        listName = updatedTask.listName
+                    )
+                } else {
+                    vm.update(updatedTask)
+                }
 
                 editorVisible = false
                 editingTask = null
             }
-        )
-    }
-
-    if (listSheetVisible) {
-        TaskListSheet(
-            lists = lists,
-            selectedList = selectedList,
-            onSelect = { name ->
-                performHaptic(view)
-                selectedList = name
-                listSheetVisible = false
-            },
-            onCreate = { name ->
-                if (listStore.addList(name)) {
-                    lists = listStore.getLists()
-                }
-            },
-            onRename = { oldName, newName ->
-                if (oldName != LocalTaskListStore.DEFAULT_LIST && newName.isNotBlank() &&
-                    lists.none { it.equals(newName.trim(), ignoreCase = true) }) {
-                    vm.tasks.value
-                        .filter { it.listName.equals(oldName, ignoreCase = true) }
-                        .forEach { task ->
-                            vm.update(task.copy(listName = newName.trim()))
-                        }
-                    if (listStore.removeList(oldName)) {
-                        listStore.addList(newName.trim())
-                        lists = listStore.getLists()
-                        if (selectedList == oldName) selectedList = newName.trim()
-                    }
-                }
-            },
-            onDelete = { name ->
-                if (name != LocalTaskListStore.DEFAULT_LIST) {
-                    vm.tasks.value
-                        .filter { it.listName.equals(name, ignoreCase = true) }
-                        .forEach { task ->
-                            vm.update(task.copy(listName = LocalTaskListStore.DEFAULT_LIST))
-                        }
-                    listStore.removeList(name)
-                    lists = listStore.getLists()
-                    if (selectedList == name) selectedList = LocalTaskListStore.DEFAULT_LIST
-                }
-            },
-            onDismiss = { listSheetVisible = false }
         )
     }
 }
@@ -525,7 +403,7 @@ private fun TaskendaHeader(
     title: String,
     subtitle: String,
     taskCount: Int,
-    selectedList: String,
+    listName: String,
     onListClick: () -> Unit
 ) {
 
@@ -561,37 +439,25 @@ private fun TaskendaHeader(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
 
-            Surface(
+            TextButton(
                 onClick = onListClick,
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.List,
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp)
-                    )
-                    Spacer(Modifier.width(7.dp))
-                    Text(
-                        text = selectedList,
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.width(2.dp))
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Cambiar lista",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Text(
+                    text = listName,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Cambiar lista",
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
 
@@ -696,14 +562,13 @@ private fun EmptyTasks(
 @Composable
 private fun TaskRow(
     task: Task,
-    subtasks: List<Subtask>,
     onToggleComplete: () -> Unit,
     onToggleImportant: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
 
-    val view = LocalView.current
+    val context = LocalContext.current
     var menuExpanded by remember(task.id) {
         mutableStateOf(false)
     }
@@ -734,7 +599,7 @@ private fun TaskRow(
             TaskCheckbox(
                 checked = task.completed,
                 onCheckedChange = {
-                    performHaptic(view)
+                    vibrate(context)
                     onToggleComplete()
                 }
             )
@@ -775,27 +640,6 @@ private fun TaskRow(
                     )
                 }
 
-                if (subtasks.isNotEmpty()) {
-                    val completedCount = subtasks.count { it.completed }
-                    Spacer(Modifier.height(5.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CheckCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "$completedCount/${subtasks.size} subtareas",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
                 task.dueDate?.let { date ->
                     Spacer(Modifier.height(5.dp))
                     Row(
@@ -817,12 +661,7 @@ private fun TaskRow(
                 }
             }
 
-            IconButton(
-                onClick = {
-                    performHaptic(view)
-                    onToggleImportant()
-                }
-            ) {
+            IconButton(onClick = onToggleImportant) {
                 Icon(
                     imageVector = if (task.important) {
                         Icons.Default.Star
@@ -843,12 +682,7 @@ private fun TaskRow(
             }
 
             Box {
-                IconButton(
-                    onClick = {
-                        performHaptic(view)
-                        menuExpanded = true
-                    }
-                ) {
+                IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Más opciones"
@@ -868,7 +702,6 @@ private fun TaskRow(
                             )
                         },
                         onClick = {
-                            performHaptic(view)
                             menuExpanded = false
                             onEdit()
                         }
@@ -883,7 +716,6 @@ private fun TaskRow(
                             )
                         },
                         onClick = {
-                            performHaptic(view)
                             menuExpanded = false
                             onDelete()
                         }
@@ -899,13 +731,12 @@ private fun TaskCheckbox(
     checked: Boolean,
     onCheckedChange: () -> Unit
 ) {
-
     IconButton(
         onClick = onCheckedChange,
         modifier = Modifier.size(48.dp)
     ) {
         Surface(
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(44.dp),
             shape = CircleShape,
             color = if (checked) {
                 MaterialTheme.colorScheme.primary
@@ -930,7 +761,7 @@ private fun TaskCheckbox(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Completada",
-                            modifier = Modifier.size(19.dp),
+                            modifier = Modifier.size(25.dp),
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
@@ -946,14 +777,11 @@ private fun TaskCheckbox(
 @Composable
 private fun TaskEditorSheet(
     task: Task?,
-    subtasks: List<Subtask>,
     lists: List<String>,
-    onManageLists: () -> Unit,
+    defaultList: String,
     onDismiss: () -> Unit,
-    onSave: (Task, List<Subtask>) -> Unit
+    onSave: (Task) -> Unit
 ) {
-
-    val view = LocalView.current
 
     var title by remember(task?.id) {
         mutableStateOf(task?.title.orEmpty())
@@ -971,19 +799,11 @@ private fun TaskEditorSheet(
         mutableStateOf(task?.dueDate)
     }
 
-    var listName by remember(task?.id) {
-        mutableStateOf(task?.listName ?: LocalTaskListStore.DEFAULT_LIST)
+    var listName by remember(task?.id, defaultList) {
+        mutableStateOf(task?.listName ?: defaultList)
     }
 
     var listMenuExpanded by remember { mutableStateOf(false) }
-
-    var localSubtasks by remember(task?.id) {
-        mutableStateOf(subtasks.toMutableList())
-    }
-
-    var newSubtaskTitle by remember(task?.id) {
-        mutableStateOf("")
-    }
 
     var datePickerVisible by remember {
         mutableStateOf(false)
@@ -996,7 +816,12 @@ private fun TaskEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .animateContentSize(
+                    animationSpec = tween(
+                        durationMillis = 220,
+                        easing = FastOutSlowInEasing
+                    )
+                )
                 .padding(
                     start = 20.dp,
                     end = 20.dp,
@@ -1029,23 +854,27 @@ private fun TaskEditorSheet(
                 placeholder = { Text("Añade información opcional") }
             )
 
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Box {
                 OutlinedButton(
-                    onClick = {
-                        performHaptic(view)
-                        listMenuExpanded = true
-                    },
+                    onClick = { listMenuExpanded = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.List, contentDescription = null)
+                    Icon(
+                        imageVector = Icons.Default.TaskAlt,
+                        contentDescription = null
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = listName,
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Start,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null
+                    )
                 }
 
                 androidx.compose.material3.DropdownMenu(
@@ -1055,33 +884,20 @@ private fun TaskEditorSheet(
                     lists.forEach { name ->
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            trailingIcon = if (name == listName) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null,
                             onClick = {
-                                performHaptic(view)
                                 listName = name
                                 listMenuExpanded = false
                             }
                         )
                     }
-
-                    androidx.compose.material3.HorizontalDivider()
-
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Gestionar listas") },
-                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                        onClick = {
-                            performHaptic(view)
-                            listMenuExpanded = false
-                            onManageLists()
-                        }
-                    )
                 }
             }
 
             OutlinedButton(
-                onClick = {
-                    performHaptic(view)
-                    datePickerVisible = true
-                },
+                onClick = { datePickerVisible = true },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
@@ -1098,106 +914,10 @@ private fun TaskEditorSheet(
 
             if (dueDate != null) {
                 TextButton(
-                    onClick = {
-                        performHaptic(view)
-                        dueDate = null
-                    },
+                    onClick = { dueDate = null },
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text("Quitar fecha")
-                }
-            }
-
-            if (localSubtasks.isNotEmpty() || task != null) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Subtareas",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (localSubtasks.isNotEmpty()) {
-                                Text(
-                                    text = "${localSubtasks.count { it.completed }}/${localSubtasks.size} completadas",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Icon(
-                            imageVector = Icons.Outlined.CheckCircle,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    localSubtasks.forEachIndexed { index, subtask ->
-                        SubtaskEditorRow(
-                            subtask = subtask,
-                            canMoveUp = index > 0,
-                            canMoveDown = index < localSubtasks.lastIndex,
-                            onToggle = {
-                                performHaptic(view)
-                                localSubtasks = localSubtasks.toMutableList().also { list ->
-                                    list[index] = subtask.copy(completed = !subtask.completed)
-                                }
-                            },
-                            onMoveUp = {
-                                performHaptic(view)
-                                if (index > 0) {
-                                    localSubtasks = localSubtasks.toMutableList().also { list ->
-                                        val item = list.removeAt(index)
-                                        list.add(index - 1, item)
-                                    }
-                                }
-                            },
-                            onMoveDown = {
-                                performHaptic(view)
-                                if (index < localSubtasks.lastIndex) {
-                                    localSubtasks = localSubtasks.toMutableList().also { list ->
-                                        val item = list.removeAt(index)
-                                        list.add(index + 1, item)
-                                    }
-                                }
-                            },
-                            onDelete = {
-                                performHaptic(view)
-                                localSubtasks = localSubtasks.toMutableList().also { it.removeAt(index) }
-                            }
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = newSubtaskTitle,
-                        onValueChange = { newSubtaskTitle = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Nueva subtarea") },
-                        placeholder = { Text("Añade un paso") },
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(
-                                enabled = newSubtaskTitle.trim().isNotBlank(),
-                                onClick = {
-                                    performHaptic(view)
-                                    localSubtasks = localSubtasks + Subtask(
-                                        taskId = task?.id ?: 0L,
-                                        title = newSubtaskTitle.trim(),
-                                        position = localSubtasks.size
-                                    )
-                                    newSubtaskTitle = ""
-                                }
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Añadir subtarea")
-                            }
-                        }
-                    )
                 }
             }
 
@@ -1230,16 +950,12 @@ private fun TaskEditorSheet(
 
                 Switch(
                     checked = important,
-                    onCheckedChange = {
-                        performHaptic(view)
-                        important = it
-                    }
+                    onCheckedChange = { important = it }
                 )
             }
 
             Button(
                 onClick = {
-                    performHaptic(view)
                     val cleanTitle = title.trim()
                     if (cleanTitle.isBlank()) return@Button
 
@@ -1256,8 +972,7 @@ private fun TaskEditorSheet(
                             important = important,
                             dueDate = dueDate,
                             listName = listName
-                        ),
-                        localSubtasks
+                        )
                     )
                 },
                 enabled = title.trim().isNotBlank(),
@@ -1286,71 +1001,20 @@ private fun TaskEditorSheet(
     }
 }
 
-@Composable
-private fun SubtaskEditorRow(
-    subtask: Subtask,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onToggle: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(start = 4.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TaskCheckbox(
-            checked = subtask.completed,
-            onCheckedChange = onToggle
-        )
-
-        Text(
-            text = subtask.title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            textDecoration = if (subtask.completed) TextDecoration.LineThrough else TextDecoration.None,
-            color = if (subtask.completed) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        IconButton(enabled = canMoveUp, onClick = onMoveUp) {
-            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Subir")
-        }
-        IconButton(enabled = canMoveDown, onClick = onMoveDown) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Bajar")
-        }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Eliminar subtarea")
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TaskListSheet(
+private fun TaskListManagerSheet(
     lists: List<String>,
     selectedList: String,
-    onSelect: (String) -> Unit,
-    onCreate: (String) -> Unit,
-    onRename: (String, String) -> Unit,
-    onDelete: (String) -> Unit,
+    onSelectList: (String) -> Unit,
+    onCreateList: (String) -> Unit,
+    onRenameList: (String, String) -> Unit,
+    onDeleteList: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val view = LocalView.current
-    var newListName by remember { mutableStateOf("") }
-    var editingName by remember { mutableStateOf<String?>(null) }
-    var editingValue by remember { mutableStateOf("") }
-    var confirmDelete by remember { mutableStateOf<String?>(null) }
+    var createDialog by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<String?>(null) }
+    var deleteTarget by remember { mutableStateOf<String?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1360,155 +1024,169 @@ private fun TaskListSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "Mis listas",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Mis listas",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Organiza tus tareas como quieras",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { createDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Nueva lista")
+                }
+            }
 
-            Text(
-                text = "Organiza tus tareas por proyectos, trabajo, casa o lo que quieras.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.height(4.dp))
 
             lists.forEach { name ->
-                Row(
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(18.dp))
-                            .then(Modifier),
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (name == selectedList) {
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (name == selectedList) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        onClick = {
-                            performHaptic(view)
-                            onSelect(name)
+                            MaterialTheme.colorScheme.surfaceContainer
                         }
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.List, contentDescription = null)
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                text = name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (name == selectedList) FontWeight.SemiBold else FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                        Icon(
+                            imageVector = Icons.Default.TaskAlt,
+                            contentDescription = null,
+                            tint = if (name == selectedList) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = name,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onSelectList(name) },
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (name == selectedList) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (name == selectedList) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (name == selectedList) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Seleccionada",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                            Spacer(Modifier.weight(1f))
-                            if (name == selectedList) {
-                                Icon(Icons.Default.Check, contentDescription = "Seleccionada")
-                            }
                         }
-                    }
-
-                    if (name != LocalTaskListStore.DEFAULT_LIST) {
-                        IconButton(
-                            onClick = {
-                                performHaptic(view)
-                                editingName = name
-                                editingValue = name
-                            }
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Renombrar lista")
+                        IconButton(onClick = { renameTarget = name }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Renombrar")
                         }
-                        IconButton(
-                            onClick = {
-                                performHaptic(view)
-                                confirmDelete = name
+                        if (name != TaskListStore.DEFAULT_LIST) {
+                            IconButton(onClick = { deleteTarget = name }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar")
                             }
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Eliminar lista")
                         }
                     }
                 }
             }
-
-            OutlinedTextField(
-                value = newListName,
-                onValueChange = { newListName = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Nueva lista") },
-                placeholder = { Text("Ej. Trabajo") },
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(
-                        enabled = newListName.trim().isNotBlank(),
-                        onClick = {
-                            performHaptic(view)
-                            onCreate(newListName)
-                            newListName = ""
-                        }
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Crear lista")
-                    }
-                }
-            )
-
-            Spacer(Modifier.height(4.dp))
         }
     }
 
-    editingName?.let { oldName ->
-        AlertDialog(
-            onDismissRequest = { editingName = null },
-            title = { Text("Renombrar lista") },
-            text = {
-                OutlinedTextField(
-                    value = editingValue,
-                    onValueChange = { editingValue = it },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = editingValue.trim().isNotBlank(),
-                    onClick = {
-                        performHaptic(view)
-                        onRename(oldName, editingValue)
-                        editingName = null
-                    }
-                ) { Text("Guardar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingName = null }) { Text("Cancelar") }
+    if (createDialog) {
+        ListNameDialog(
+            title = "Nueva lista",
+            confirmText = "Crear",
+            onDismiss = { createDialog = false },
+            onConfirm = {
+                onCreateList(it)
+                createDialog = false
             }
         )
     }
 
-    confirmDelete?.let { name ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            title = { Text("Eliminar lista") },
-            text = { Text("Las tareas de «$name» pasarán a «${LocalTaskListStore.DEFAULT_LIST}». No se eliminarán.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        performHaptic(view)
-                        onDelete(name)
-                        confirmDelete = null
-                    }
-                ) { Text("Eliminar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") }
+    renameTarget?.let { oldName ->
+        ListNameDialog(
+            title = "Renombrar lista",
+            initialName = oldName,
+            confirmText = "Guardar",
+            onDismiss = { renameTarget = null },
+            onConfirm = {
+                onRenameList(oldName, it)
+                renameTarget = null
             }
         )
     }
+
+    deleteTarget?.let { name ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Eliminar lista") },
+            text = { Text("Las tareas de «$name» pasarán a «${TaskListStore.DEFAULT_LIST}».") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteList(name)
+                    deleteTarget = null
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Cancelar") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ListNameDialog(
+    title: String,
+    initialName: String = "",
+    confirmText: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Nombre") }
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.trim().isNotBlank(),
+                onClick = { onConfirm(name.trim()) }
+            ) { Text(confirmText) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1519,7 +1197,6 @@ private fun TaskDatePickerDialog(
     onDateSelected: (Long) -> Unit
 ) {
 
-    val view = LocalView.current
     val state = rememberDatePickerState(
         initialSelectedDateMillis = initialDate
     )
@@ -1529,7 +1206,6 @@ private fun TaskDatePickerDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    performHaptic(view)
                     val selected = state.selectedDateMillis
                     if (selected != null) {
                         onDateSelected(selected)
@@ -1542,12 +1218,7 @@ private fun TaskDatePickerDialog(
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = {
-                    performHaptic(view)
-                    onDismiss()
-                }
-            ) {
+            TextButton(onClick = onDismiss) {
                 Text("Cancelar")
             }
         }
@@ -1561,9 +1232,6 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
-
-    val view = LocalView.current
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -1587,15 +1255,11 @@ private fun TaskendaBottomBar(
         ) {
             NavigationBarItem(
                 selected = selectedTab == 0,
-                onClick = { performHaptic(view); onTabSelected(0) },
+                onClick = { onTabSelected(0) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = if (selectedTab == 0) {
-                            Icons.Default.Event
-                        } else {
-                            Icons.Outlined.Event
-                        },
+                        imageVector = Icons.Default.CalendarToday,
                         contentDescription = "Hoy"
                     )
                 },
@@ -1607,7 +1271,7 @@ private fun TaskendaBottomBar(
 
             NavigationBarItem(
                 selected = selectedTab == 1,
-                onClick = { performHaptic(view); onTabSelected(1) },
+                onClick = { onTabSelected(1) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
@@ -1623,15 +1287,11 @@ private fun TaskendaBottomBar(
 
             NavigationBarItem(
                 selected = selectedTab == 2,
-                onClick = { performHaptic(view); onTabSelected(2) },
+                onClick = { onTabSelected(2) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = if (selectedTab == 2) {
-                            Icons.Default.Star
-                        } else {
-                            Icons.Outlined.StarBorder
-                        },
+                        imageVector = Icons.Default.Star,
                         contentDescription = "Importantes"
                     )
                 },
@@ -1643,15 +1303,11 @@ private fun TaskendaBottomBar(
 
             NavigationBarItem(
                 selected = selectedTab == 3,
-                onClick = { performHaptic(view); onTabSelected(3) },
+                onClick = { onTabSelected(3) },
                 modifier = Modifier.weight(1f),
                 icon = {
                     Icon(
-                        imageVector = if (selectedTab == 3) {
-                            Icons.Default.CheckCircle
-                        } else {
-                            Icons.Outlined.CheckCircle
-                        },
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Completadas"
                     )
                 },
@@ -1664,6 +1320,16 @@ private fun TaskendaBottomBar(
     }
 }
 
+private fun isTodayOrOverdue(dueDate: Long?): Boolean {
+    if (dueDate == null) return false
+
+    val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.ROOT)
+    val taskDate = dateFormat.format(Date(dueDate))
+    val today = dateFormat.format(Date())
+
+    return taskDate <= today
+}
+
 private fun formatDate(millis: Long): String {
     return SimpleDateFormat(
         "d MMM",
@@ -1671,8 +1337,20 @@ private fun formatDate(millis: Long): String {
     ).format(Date(millis))
 }
 
-private fun performHaptic(view: android.view.View) {
-    view.performHapticFeedback(
-        android.view.HapticFeedbackConstants.CONTEXT_CLICK
-    )
+private fun vibrate(context: Context) {
+    val vibrator = ContextCompat.getSystemService(
+        context,
+        Vibrator::class.java
+    ) ?: return
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        vibrator.vibrate(
+            VibrationEffect.createPredefined(
+                VibrationEffect.EFFECT_CLICK
+            )
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(18)
+    }
 }
