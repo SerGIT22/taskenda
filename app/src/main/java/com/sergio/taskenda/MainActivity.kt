@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -91,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.sergio.taskenda.data.Task
+import com.sergio.taskenda.data.Subtask
 import com.sergio.taskenda.data.TaskDatabase
 import com.sergio.taskenda.data.TaskRepository
 import com.sergio.taskenda.data.TaskListStore
@@ -98,6 +102,7 @@ import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
 import org.json.JSONArray
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -172,7 +177,10 @@ class MainActivity : ComponentActivity() {
             TaskDatabase::class.java,
             "taskenda.db"
         )
-            .addMigrations(TaskDatabase.MIGRATION_1_2)
+            .addMigrations(
+                TaskDatabase.MIGRATION_1_2,
+                TaskDatabase.MIGRATION_2_3
+            )
             .fallbackToDestructiveMigration()
             .build()
 
@@ -212,6 +220,11 @@ private fun TaskendaApp(vm: TaskViewModel) {
 
     val view = LocalView.current
     val tasks by vm.tasks.collectAsState()
+    val subtasks by vm.subtasks.collectAsState()
+
+    val subtasksByTask = remember(subtasks) {
+        subtasks.groupBy { it.taskId }
+    }
 
     var selectedTab by remember {
         mutableIntStateOf(0)
@@ -246,8 +259,25 @@ private fun TaskendaApp(vm: TaskViewModel) {
         listTasks.filter { !it.completed && it.important }
     }
 
+    // "Hoy" incluye tareas pendientes atrasadas y las que vencen hoy.
+    // Las tareas con fecha futura (por ejemplo, mañana) solo aparecen en "Tareas".
+    val todayTasks = remember(pendingTasks) {
+        val tomorrowStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, 1)
+        }.timeInMillis
+
+        pendingTasks.filter { task ->
+            task.dueDate != null && task.dueDate < tomorrowStart
+        }
+    }
+
     val visibleTasks = when (selectedTab) {
-        0, 1 -> pendingTasks
+        0 -> todayTasks
+        1 -> pendingTasks
         2 -> importantTasks
         3 -> completedTasks
         else -> emptyList()
@@ -270,7 +300,8 @@ private fun TaskendaApp(vm: TaskViewModel) {
     }
 
     val headerCount = when (selectedTab) {
-        0, 1 -> pendingTasks.size
+        0 -> todayTasks.size
+        1 -> pendingTasks.size
         2 -> importantTasks.size
         3 -> completedTasks.size
         else -> 0
@@ -366,7 +397,8 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 ) { tab ->
 
                     val tabTasks = when (tab) {
-                        0, 1 -> pendingTasks
+                        0 -> todayTasks
+                        1 -> pendingTasks
                         2 -> importantTasks
                         3 -> completedTasks
                         else -> emptyList()
@@ -398,6 +430,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                             ) { task ->
                                 TaskRow(
                                     task = task,
+                                    subtasks = subtasksByTask[task.id].orEmpty(),
                                     onToggleComplete = {
                                         vm.toggle(task)
                                     },
@@ -423,6 +456,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
     if (editorVisible) {
         TaskEditorSheet(
             task = editingTask,
+            subtasks = editingTask?.let { subtasksByTask[it.id].orEmpty() } ?: emptyList(),
             lists = lists,
             onManageLists = {
                 listSheetVisible = true
@@ -431,18 +465,8 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 editorVisible = false
                 editingTask = null
             },
-            onSave = { updatedTask ->
-                if (editingTask == null) {
-                    vm.add(
-                        title = updatedTask.title,
-                        notes = updatedTask.notes,
-                        important = updatedTask.important,
-                        dueDate = updatedTask.dueDate,
-                        listName = updatedTask.listName
-                    )
-                } else {
-                    vm.update(updatedTask)
-                }
+            onSave = { updatedTask, updatedSubtasks ->
+                vm.save(updatedTask, updatedSubtasks)
 
                 editorVisible = false
                 editingTask = null
@@ -672,6 +696,7 @@ private fun EmptyTasks(
 @Composable
 private fun TaskRow(
     task: Task,
+    subtasks: List<Subtask>,
     onToggleComplete: () -> Unit,
     onToggleImportant: () -> Unit,
     onEdit: () -> Unit,
@@ -748,6 +773,27 @@ private fun TaskRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                if (subtasks.isNotEmpty()) {
+                    val completedCount = subtasks.count { it.completed }
+                    Spacer(Modifier.height(5.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "$completedCount/${subtasks.size} subtareas",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 task.dueDate?.let { date ->
@@ -900,10 +946,11 @@ private fun TaskCheckbox(
 @Composable
 private fun TaskEditorSheet(
     task: Task?,
+    subtasks: List<Subtask>,
     lists: List<String>,
     onManageLists: () -> Unit,
     onDismiss: () -> Unit,
-    onSave: (Task) -> Unit
+    onSave: (Task, List<Subtask>) -> Unit
 ) {
 
     val view = LocalView.current
@@ -930,6 +977,14 @@ private fun TaskEditorSheet(
 
     var listMenuExpanded by remember { mutableStateOf(false) }
 
+    var localSubtasks by remember(task?.id) {
+        mutableStateOf(subtasks.toMutableList())
+    }
+
+    var newSubtaskTitle by remember(task?.id) {
+        mutableStateOf("")
+    }
+
     var datePickerVisible by remember {
         mutableStateOf(false)
     }
@@ -941,6 +996,7 @@ private fun TaskEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(
                     start = 20.dp,
                     end = 20.dp,
@@ -1052,6 +1108,99 @@ private fun TaskEditorSheet(
                 }
             }
 
+            if (localSubtasks.isNotEmpty() || task != null) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Subtareas",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (localSubtasks.isNotEmpty()) {
+                                Text(
+                                    text = "${localSubtasks.count { it.completed }}/${localSubtasks.size} completadas",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    localSubtasks.forEachIndexed { index, subtask ->
+                        SubtaskEditorRow(
+                            subtask = subtask,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < localSubtasks.lastIndex,
+                            onToggle = {
+                                performHaptic(view)
+                                localSubtasks = localSubtasks.toMutableList().also { list ->
+                                    list[index] = subtask.copy(completed = !subtask.completed)
+                                }
+                            },
+                            onMoveUp = {
+                                performHaptic(view)
+                                if (index > 0) {
+                                    localSubtasks = localSubtasks.toMutableList().also { list ->
+                                        val item = list.removeAt(index)
+                                        list.add(index - 1, item)
+                                    }
+                                }
+                            },
+                            onMoveDown = {
+                                performHaptic(view)
+                                if (index < localSubtasks.lastIndex) {
+                                    localSubtasks = localSubtasks.toMutableList().also { list ->
+                                        val item = list.removeAt(index)
+                                        list.add(index + 1, item)
+                                    }
+                                }
+                            },
+                            onDelete = {
+                                performHaptic(view)
+                                localSubtasks = localSubtasks.toMutableList().also { it.removeAt(index) }
+                            }
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = newSubtaskTitle,
+                        onValueChange = { newSubtaskTitle = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nueva subtarea") },
+                        placeholder = { Text("Añade un paso") },
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(
+                                enabled = newSubtaskTitle.trim().isNotBlank(),
+                                onClick = {
+                                    performHaptic(view)
+                                    localSubtasks = localSubtasks + Subtask(
+                                        taskId = task?.id ?: 0L,
+                                        title = newSubtaskTitle.trim(),
+                                        position = localSubtasks.size
+                                    )
+                                    newSubtaskTitle = ""
+                                }
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Añadir subtarea")
+                            }
+                        }
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -1107,7 +1256,8 @@ private fun TaskEditorSheet(
                             important = important,
                             dueDate = dueDate,
                             listName = listName
-                        )
+                        ),
+                        localSubtasks
                     )
                 },
                 enabled = title.trim().isNotBlank(),
@@ -1133,6 +1283,55 @@ private fun TaskEditorSheet(
                 datePickerVisible = false
             }
         )
+    }
+}
+
+@Composable
+private fun SubtaskEditorRow(
+    subtask: Subtask,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onToggle: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(start = 4.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TaskCheckbox(
+            checked = subtask.completed,
+            onCheckedChange = onToggle
+        )
+
+        Text(
+            text = subtask.title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            textDecoration = if (subtask.completed) TextDecoration.LineThrough else TextDecoration.None,
+            color = if (subtask.completed) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        IconButton(enabled = canMoveUp, onClick = onMoveUp) {
+            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Subir")
+        }
+        IconButton(enabled = canMoveDown, onClick = onMoveDown) {
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Bajar")
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Delete, contentDescription = "Eliminar subtarea")
+        }
     }
 }
 
