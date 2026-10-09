@@ -59,8 +59,8 @@ abstract class TaskDatabase : RoomDatabase() {
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         taskId INTEGER NOT NULL,
                         title TEXT NOT NULL,
-                        completed INTEGER NOT NULL DEFAULT 0,
-                        position INTEGER NOT NULL DEFAULT 0,
+                        completed INTEGER NOT NULL,
+                        position INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL,
                         FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
                     )
