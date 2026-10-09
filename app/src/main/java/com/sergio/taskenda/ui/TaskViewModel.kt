@@ -9,7 +9,6 @@ import com.sergio.taskenda.data.TaskRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -93,3 +92,93 @@ class TaskViewModel(
             }
         }
     }
+
+    fun add(
+        title: String,
+        notes: String = "",
+        important: Boolean = false,
+        dueDate: Long? = null,
+        listName: String = TaskListStore.DEFAULT_LIST
+    ) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.add(
+                Task(
+                    title = cleanTitle,
+                    notes = notes.trim(),
+                    important = important,
+                    dueDate = dueDate,
+                    listName = listName.trim().ifEmpty { TaskListStore.DEFAULT_LIST }
+                )
+            )
+        }
+    }
+
+    fun save(task: Task, subtasks: List<Subtask>) {
+        if (task.title.isBlank()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveTaskWithSubtasks(
+                task.copy(
+                    title = task.title.trim(),
+                    notes = task.notes.trim(),
+                    listName = task.listName.trim().ifEmpty { TaskListStore.DEFAULT_LIST }
+                ),
+                subtasks.filter { it.title.isNotBlank() }
+            )
+        }
+    }
+
+    fun toggle(task: Task) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.update(task.copy(completed = !task.completed))
+        }
+    }
+
+    fun setImportant(task: Task) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.update(task.copy(important = !task.important))
+        }
+    }
+
+    fun update(task: Task) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.update(task)
+        }
+    }
+
+    fun delete(task: Task) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.delete(task)
+        }
+    }
+
+    fun toggleSubtask(subtask: Subtask) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateSubtask(subtask.copy(completed = !subtask.completed))
+        }
+    }
+
+    fun deleteSubtask(subtask: Subtask) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteSubtask(subtask)
+        }
+    }
+
+    fun addSubtask(taskId: Long, title: String, position: Int) {
+        val clean = title.trim()
+        if (taskId == 0L || clean.isEmpty()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.addSubtask(
+                Subtask(
+                    taskId = taskId,
+                    title = clean,
+                    position = position
+                )
+            )
+        }
+    }
+}
