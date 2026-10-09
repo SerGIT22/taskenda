@@ -1,6 +1,7 @@
 package com.sergio.taskenda
 
 import android.content.Context
+import android.view.HapticFeedbackConstants
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -8,13 +9,17 @@ import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -26,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -91,7 +97,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1394,89 +1402,133 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
+    val view = LocalView.current
+    val colors = MaterialTheme.colorScheme
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(
-                start = 10.dp,
-                end = 10.dp,
-                bottom = 8.dp
-            ),
+            .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
         shape = RoundedCornerShape(28.dp),
         tonalElevation = 4.dp,
         shadowElevation = 6.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        color = colors.surfaceContainerHigh
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 4.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NavigationBarItem(
-                selected = selectedTab == 0,
-                onClick = { onTabSelected(0) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = "Hoy"
-                    )
+            TaskendaBottomItem(
+                index = 0,
+                selectedTab = selectedTab,
+                label = "Hoy",
+                icon = Icons.Outlined.Event,
+                selectedIcon = Icons.Default.CalendarToday,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onTabSelected(0)
                 },
-                label = { Text("Hoy", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                modifier = Modifier.weight(1f)
             )
-
-            NavigationBarItem(
-                selected = selectedTab == 1,
-                onClick = { onTabSelected(1) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.TaskAlt,
-                        contentDescription = "Tareas"
-                    )
+            TaskendaBottomItem(
+                index = 1,
+                selectedTab = selectedTab,
+                label = "Tareas",
+                icon = Icons.Outlined.CheckCircle,
+                selectedIcon = Icons.Default.TaskAlt,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onTabSelected(1)
                 },
-                label = { Text("Tareas", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                modifier = Modifier.weight(1f)
             )
-
-            NavigationBarItem(
-                selected = selectedTab == 2,
-                onClick = { onTabSelected(2) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "Importantes"
-                    )
+            TaskendaBottomItem(
+                index = 2,
+                selectedTab = selectedTab,
+                label = "Importantes",
+                icon = Icons.Outlined.StarBorder,
+                selectedIcon = Icons.Default.Star,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onTabSelected(2)
                 },
-                label = { Text("Importantes", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                modifier = Modifier.weight(1f)
             )
-
-            NavigationBarItem(
-                selected = selectedTab == 3,
-                onClick = { onTabSelected(3) },
-                modifier = Modifier.weight(1f),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Completadas"
-                    )
+            TaskendaBottomItem(
+                index = 3,
+                selectedTab = selectedTab,
+                label = "Completadas",
+                icon = Icons.Outlined.CheckCircle,
+                selectedIcon = Icons.Default.CheckCircle,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onTabSelected(3)
                 },
-                label = { Text("Completadas", maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskendaBottomItem(
+    index: Int,
+    selectedTab: Int,
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selected = selectedTab == index
+    val shape = RoundedCornerShape(22.dp)
+    val colors = MaterialTheme.colorScheme
+
+    Column(
+        modifier = modifier
+            .height(60.dp)
+            .padding(horizontal = 2.dp)
+            .clip(shape)
+            .background(
+                color = if (selected) colors.primaryContainer else Color.Transparent,
+                shape = shape
+            )
+            .then(
+                if (selected) Modifier.border(
+                    width = 1.5.dp,
+                    color = colors.primary,
+                    shape = shape
+                ) else Modifier
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 3.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = if (selected) selectedIcon else icon,
+            contentDescription = label,
+            tint = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+            modifier = Modifier.size(22.dp)
+        )
+        AnimatedVisibility(
+            visible = selected,
+            enter = fadeIn(animationSpec = tween(140)),
+            exit = fadeOut(animationSpec = tween(90))
+        ) {
+            Text(
+                text = label,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                color = colors.onPrimaryContainer,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

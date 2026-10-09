@@ -1,0 +1,17 @@
+CORRECCION DE COMPILACION - TASKENDA FASE 2.2
+
+IMPORTANTE: los errores de GitHub Actions indican que los archivos que se estan compilando NO coinciden con los archivos Kotlin limpios de este paquete.
+
+Sustituye los archivos en las rutas completas que aparecen dentro de app/src/main/java/.
+No copies desde un bloque Markdown. No incluyas las lineas ```kotlin ni ``` en ningun archivo .kt.
+
+Archivos principales a reemplazar para resolver los errores del registro:
+- app/src/main/java/com/sergio/taskenda/ui/TaskViewModel.kt
+- app/src/main/java/com/sergio/taskenda/ui/TaskViewModelFactory.kt
+- app/src/main/java/com/sergio/taskenda/MainActivity.kt
+
+El TaskViewModel incluido tiene las llaves cerradas y define toggle, setImportant, delete y save.
+El TaskViewModelFactory incluido empieza directamente por `package com.sergio.taskenda.ui` y no contiene cercas Markdown.
+
+No borres la base de datos ni desinstales la app. Ejecuta GitHub Actions tras guardar los archivos.
+Este paquete no implica que se haya ejecutado una compilacion Android real en este entorno.

@@ -22,3 +22,12 @@ IMPORTANTE:
 
 LÍMITE DE VERIFICACIÓN:
 El paquete se ha preparado con los archivos fuente completos y las rutas correctas, pero en este entorno no está disponible el proyecto Gradle completo ni Android SDK para ejecutar una compilación Android real. Por tanto, no se afirma que GitHub Actions haya compilado correctamente.
+
+
+BARRA INFERIOR ESTILO DIARIO
+- La seccion seleccionada ocupa toda su celda con borde de color y fondo tonal.
+- Solo la seccion activa muestra el texto; las demas muestran el icono.
+- Cada cambio de seccion usa retroalimentacion haptica del sistema.
+- La barra conserva el tema dinamico claro/oscuro.
+
+Este paquete no ha sido compilado en un entorno Android; valida el resultado con GitHub Actions antes de instalarlo.
