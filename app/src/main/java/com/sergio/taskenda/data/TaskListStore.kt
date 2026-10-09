@@ -1,53 +1,51 @@
 package com.sergio.taskenda.data
 
 import android.content.Context
-import org.json.JSONArray
 
 class TaskListStore(context: Context) {
 
     private val preferences = context.getSharedPreferences(
-        PREFS_NAME,
+        "taskenda_lists",
         Context.MODE_PRIVATE
     )
 
-    fun loadLists(): List<String> {
-        val raw = preferences.getString(KEY_LISTS, null) ?: return listOf(DEFAULT_LIST)
-        return runCatching {
-            val json = JSONArray(raw)
-            buildList {
-                for (index in 0 until json.length()) {
-                    val value = json.optString(index).trim()
-                    if (value.isNotBlank() && !contains(value)) add(value)
-                }
-            }.ifEmpty { listOf(DEFAULT_LIST) }
-        }.getOrDefault(listOf(DEFAULT_LIST))
-    }
-
-    fun saveLists(lists: List<String>) {
-        val clean = lists
+    fun getLists(): List<String> {
+        val stored = preferences.getStringSet(KEY_LISTS, null)?.toList().orEmpty()
+        return (listOf(DEFAULT_LIST) + stored)
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
-            .let { if (it.contains(DEFAULT_LIST)) it else listOf(DEFAULT_LIST) + it }
-
-        val json = JSONArray()
-        clean.forEach(json::put)
-        preferences.edit().putString(KEY_LISTS, json.toString()).apply()
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
+            .let { lists ->
+                listOf(DEFAULT_LIST) + lists.filterNot { it == DEFAULT_LIST }
+            }
     }
 
-    fun getSelectedList(): String {
-        val saved = preferences.getString(KEY_SELECTED_LIST, DEFAULT_LIST).orEmpty()
-        return if (loadLists().contains(saved)) saved else DEFAULT_LIST
+    fun addList(name: String): Boolean {
+        val clean = name.trim()
+        if (clean.isBlank() || clean.equals(DEFAULT_LIST, ignoreCase = true)) return false
+
+        val lists = getLists().toMutableSet()
+        if (!lists.add(clean)) return false
+
+        return preferences.edit()
+            .putStringSet(KEY_LISTS, lists.filterNot { it == DEFAULT_LIST }.toSet())
+            .commit()
     }
 
-    fun saveSelectedList(name: String) {
-        preferences.edit().putString(KEY_SELECTED_LIST, name).apply()
+    fun removeList(name: String): Boolean {
+        if (name == DEFAULT_LIST) return false
+
+        val lists = getLists().toMutableSet()
+        if (!lists.remove(name)) return false
+
+        return preferences.edit()
+            .putStringSet(KEY_LISTS, lists.filterNot { it == DEFAULT_LIST }.toSet())
+            .commit()
     }
 
     companion object {
         const val DEFAULT_LIST = "Mis tareas"
-        private const val PREFS_NAME = "taskenda_lists"
         private const val KEY_LISTS = "lists"
-        private const val KEY_SELECTED_LIST = "selected_list"
     }
 }
