@@ -1,0 +1,24 @@
+TASKENDA — REEMPLAZO DE ARCHIVOS PARA FASE 2.2 (SUBTAREAS)
+
+Este paquete contiene los archivos completos con las rutas exactas para copiarlos al repositorio.
+No pegues los archivos uno detrás de otro ni incluyas las marcas ```kotlin o ``` al copiarlos.
+
+Archivos incluidos:
+- app/src/main/java/com/sergio/taskenda/MainActivity.kt
+- app/src/main/java/com/sergio/taskenda/data/Task.kt
+- app/src/main/java/com/sergio/taskenda/data/TaskDao.kt
+- app/src/main/java/com/sergio/taskenda/data/TaskDatabase.kt
+- app/src/main/java/com/sergio/taskenda/data/TaskListStore.kt
+- app/src/main/java/com/sergio/taskenda/data/TaskRepository.kt
+- app/src/main/java/com/sergio/taskenda/data/Subtask.kt
+- app/src/main/java/com/sergio/taskenda/ui/TaskViewModel.kt
+- app/src/main/java/com/sergio/taskenda/ui/TaskViewModelFactory.kt
+
+IMPORTANTE:
+- Se han conservado las migraciones de Room 1→2 y 2→3.
+- Se ha quitado fallbackToDestructiveMigration() para evitar que Room borre la base de datos si encuentra una versión sin migración.
+- No desinstales la app ni borres sus datos.
+- La corrección del registro de GitHub Actions es reemplazar cada archivo en su ruta por su archivo correspondiente de este paquete. El registro anterior muestra contenido inválido en MainActivity.kt y un TaskViewModelFactory.kt con cientos de líneas, señales de que se pegó contenido que no correspondía a esos archivos.
+
+LÍMITE DE VERIFICACIÓN:
+El paquete se ha preparado con los archivos fuente completos y las rutas correctas, pero en este entorno no está disponible el proyecto Gradle completo ni Android SDK para ejecutar una compilación Android real. Por tanto, no se afirma que GitHub Actions haya compilado correctamente.
