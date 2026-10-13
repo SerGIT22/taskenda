@@ -17,6 +17,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,6 +34,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -42,6 +44,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1567,11 +1570,6 @@ private fun TaskendaBottomBar(
 ) {
     val view = LocalView.current
     val colors = MaterialTheme.colorScheme
-    val barColor by animateColorAsState(
-        targetValue = colors.surfaceContainerHigh,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "taskenda_bar_color"
-    )
 
     Surface(
         modifier = Modifier
@@ -1581,14 +1579,13 @@ private fun TaskendaBottomBar(
         shape = RoundedCornerShape(28.dp),
         tonalElevation = 3.dp,
         shadowElevation = 5.dp,
-        color = barColor
+        color = colors.surfaceContainerHigh
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .padding(horizontal = 5.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 5.dp, vertical = 4.dp)
         ) {
             val destinations = listOf(
                 Triple("Hoy", Icons.Outlined.Event, Icons.Default.CalendarToday),
@@ -1596,21 +1593,51 @@ private fun TaskendaBottomBar(
                 Triple("Importantes", Icons.Outlined.StarBorder, Icons.Default.Star),
                 Triple("Completadas", Icons.Outlined.CheckCircle, Icons.Default.CheckCircle)
             )
-            destinations.forEachIndexed { index, destination ->
-                TaskendaBottomItem(
-                    index = index,
-                    selectedTab = selectedTab,
-                    label = destination.first,
-                    icon = destination.second,
-                    selectedIcon = destination.third,
-                    onClick = {
-                        if (selectedTab != index) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                            onTabSelected(index)
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+            val itemWidth = maxWidth / destinations.size
+            val indicatorWidth = itemWidth - 4.dp
+            val indicatorOffset by animateDpAsState(
+                targetValue = itemWidth * selectedTab + 2.dp,
+                animationSpec = spring(
+                    dampingRatio = 0.78f,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "taskenda_nav_indicator_offset"
+            )
+
+            // Una única cápsula se desplaza entre destinos, como en Diario.
+            // No se dibuja borde individual alrededor de cada botón.
+            Surface(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(indicatorWidth)
+                    .height(52.dp)
+                    .align(Alignment.CenterStart),
+                shape = RoundedCornerShape(24.dp),
+                color = colors.primary,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
+            ) {}
+
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                destinations.forEachIndexed { index, destination ->
+                    TaskendaBottomItem(
+                        index = index,
+                        selectedTab = selectedTab,
+                        label = destination.first,
+                        icon = destination.second,
+                        selectedIcon = destination.third,
+                        onClick = {
+                            if (selectedTab != index) {
+                                view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                                onTabSelected(index)
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -1627,34 +1654,17 @@ private fun TaskendaBottomItem(
     modifier: Modifier = Modifier
 ) {
     val selected = selectedTab == index
-    val shape = RoundedCornerShape(22.dp)
     val colors = MaterialTheme.colorScheme
-    val backgroundColor by animateColorAsState(
-        targetValue = if (selected) colors.primaryContainer else Color.Transparent,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "taskenda_nav_background_$index"
-    )
     val contentColor by animateColorAsState(
-        targetValue = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
-        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        targetValue = if (selected) colors.onPrimary else colors.onSurfaceVariant,
+        animationSpec = tween(160, easing = FastOutSlowInEasing),
         label = "taskenda_nav_content_$index"
     )
-    val borderColor by animateColorAsState(
-        targetValue = if (selected) colors.primary.copy(alpha = 0.72f) else Color.Transparent,
-        animationSpec = tween(180, easing = FastOutSlowInEasing),
-        label = "taskenda_nav_border_$index"
-    )
+
     Column(
         modifier = modifier
-            .height(60.dp)
-            .padding(horizontal = 2.dp)
-            .clip(shape)
-            .background(backgroundColor, shape)
-            .border(
-                width = if (selected) 1.25.dp else 0.dp,
-                color = borderColor,
-                shape = shape
-            )
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 2.dp, vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1674,12 +1684,12 @@ private fun TaskendaBottomItem(
         }
         AnimatedVisibility(
             visible = selected,
-            enter = fadeIn(tween(130)) + expandVertically(
+            enter = fadeIn(tween(140)) + expandVertically(
                 animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                 expandFrom = Alignment.Top
             ),
-            exit = fadeOut(tween(90)) + shrinkVertically(
-                animationSpec = tween(100, easing = FastOutSlowInEasing),
+            exit = fadeOut(tween(100)) + shrinkVertically(
+                animationSpec = tween(110, easing = FastOutSlowInEasing),
                 shrinkTowards = Alignment.Top
             )
         ) {
