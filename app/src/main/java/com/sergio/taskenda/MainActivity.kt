@@ -457,7 +457,11 @@ private fun TaskendaApp(vm: TaskViewModel) {
                             ) {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
-                                Text("No hay resultados", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "No hay resultados",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                                 Text("Prueba con otro término.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         } else EmptyTasks(
@@ -582,6 +586,7 @@ private fun TaskendaHeader(
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -685,6 +690,7 @@ private fun EmptyTasks(
                     else -> "No tienes tareas pendientes"
                 },
                 style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
