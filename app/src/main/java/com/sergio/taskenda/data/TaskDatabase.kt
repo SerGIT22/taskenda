@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Task::class, Subtask::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class TaskDatabase : RoomDatabase() {
@@ -70,6 +70,13 @@ abstract class TaskDatabase : RoomDatabase() {
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_subtasks_taskId ON subtasks(taskId)"
                 )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE tasks ADD COLUMN reminderAt INTEGER")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'NONE'")
             }
         }
     }

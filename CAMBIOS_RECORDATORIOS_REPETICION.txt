@@ -1,0 +1,18 @@
+TASKENDA — RECORDATORIOS Y TAREAS RECURRENTES
+
+Cambios incluidos:
+- Nueva columna reminderAt para fecha y hora del recordatorio.
+- Nueva columna recurrence: NONE, DAILY, WEEKLY o MONTHLY.
+- Migración Room 3 -> 4 sin borrar ni recrear la base de datos.
+- Selector de fecha y hora para recordatorios en el editor de tareas.
+- Selección de repetición: nunca, diaria, semanal o mensual.
+- Notificación Android al llegar la hora programada.
+- Al completar una tarea recurrente se conserva como completada y se crea la siguiente.
+- La siguiente tarea conserva título, notas, lista, importancia, repetición y subtareas (estas vuelven a quedar pendientes).
+- Se cancela el recordatorio al completar o eliminar la tarea y se vuelve a programar al editarla.
+
+IMPORTANTE:
+- No se ha ejecutado una compilación Android real en este entorno porque no hay Gradle wrapper ni Android SDK instalado aquí.
+- Ejecuta GitHub Actions antes de instalar el APK.
+- No desinstales la app ni borres sus datos: la migración está diseñada para conservar las tareas existentes.
+- Android 13 o posterior requiere permiso de notificaciones. Taskenda lo solicita al configurar un recordatorio.

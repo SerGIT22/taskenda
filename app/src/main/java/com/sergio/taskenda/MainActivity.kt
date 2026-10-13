@@ -1,6 +1,10 @@
 package com.sergio.taskenda
 
+import android.app.Activity
+import android.app.DatePickerDialog as AndroidDatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
+import android.content.pm.PackageManager
 import android.view.HapticFeedbackConstants
 import android.os.Build
 import android.os.Bundle
@@ -114,6 +118,7 @@ import com.sergio.taskenda.data.TaskListStore
 import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -129,7 +134,8 @@ class MainActivity : ComponentActivity() {
         )
             .addMigrations(
                 TaskDatabase.MIGRATION_1_2,
-                TaskDatabase.MIGRATION_2_3
+                TaskDatabase.MIGRATION_2_3,
+                TaskDatabase.MIGRATION_3_4
             )
             .build()
 
@@ -152,7 +158,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = colorScheme) {
                 val listStore = remember { TaskListStore(context) }
                 val vm: TaskViewModel = viewModel(
-                    factory = TaskViewModelFactory(repository, listStore)
+                    factory = TaskViewModelFactory(repository, listStore, context)
                 )
 
                 TaskendaApp(vm)
@@ -813,6 +819,8 @@ private fun TaskEditorSheet(
     onSave: (Task, List<Subtask>) -> Unit
 ) {
 
+    val context = LocalContext.current
+
     var title by remember(task?.id) {
         mutableStateOf(task?.title.orEmpty())
     }
@@ -828,6 +836,16 @@ private fun TaskEditorSheet(
     var dueDate by remember(task?.id) {
         mutableStateOf(task?.dueDate)
     }
+
+    var reminderAt by remember(task?.id) {
+        mutableStateOf(task?.reminderAt)
+    }
+
+    var recurrence by remember(task?.id) {
+        mutableStateOf(task?.recurrence ?: "NONE")
+    }
+
+    var repeatMenuExpanded by remember { mutableStateOf(false) }
 
     var listName by remember(task?.id, defaultList) {
         mutableStateOf(task?.listName ?: defaultList)
@@ -953,6 +971,115 @@ private fun TaskEditorSheet(
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text("Quitar fecha")
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    val activity = context as? Activity
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        activity?.requestPermissions(
+                            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                            7103
+                        )
+                    }
+
+                    val initial = Calendar.getInstance().apply {
+                        timeInMillis = reminderAt ?: dueDate ?: System.currentTimeMillis()
+                    }
+                    AndroidDatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            val selected = Calendar.getInstance().apply {
+                                timeInMillis = reminderAt ?: dueDate ?: System.currentTimeMillis()
+                                set(Calendar.YEAR, year)
+                                set(Calendar.MONTH, month)
+                                set(Calendar.DAY_OF_MONTH, day)
+                            }
+                            TimePickerDialog(
+                                context,
+                                { _, hour, minute ->
+                                    selected.set(Calendar.HOUR_OF_DAY, hour)
+                                    selected.set(Calendar.MINUTE, minute)
+                                    selected.set(Calendar.SECOND, 0)
+                                    selected.set(Calendar.MILLISECOND, 0)
+                                    reminderAt = selected.timeInMillis
+                                },
+                                selected.get(Calendar.HOUR_OF_DAY),
+                                selected.get(Calendar.MINUTE),
+                                true
+                            ).show()
+                        },
+                        initial.get(Calendar.YEAR),
+                        initial.get(Calendar.MONTH),
+                        initial.get(Calendar.DAY_OF_MONTH)
+                    ).show()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.Event, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = reminderAt?.let(::formatReminder) ?: "Añadir recordatorio",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (reminderAt != null) {
+                TextButton(
+                    onClick = { reminderAt = null },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Quitar recordatorio")
+                }
+            }
+
+            Box {
+                OutlinedButton(
+                    onClick = { repeatMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = when (recurrence) {
+                            "DAILY" -> "Repetir: cada día"
+                            "WEEKLY" -> "Repetir: cada semana"
+                            "MONTHLY" -> "Repetir: cada mes"
+                            else -> "No se repite"
+                        },
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Start
+                    )
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                }
+                androidx.compose.material3.DropdownMenu(
+                    expanded = repeatMenuExpanded,
+                    onDismissRequest = { repeatMenuExpanded = false }
+                ) {
+                    listOf(
+                        "NONE" to "No se repite",
+                        "DAILY" to "Cada día",
+                        "WEEKLY" to "Cada semana",
+                        "MONTHLY" to "Cada mes"
+                    ).forEach { (value, label) ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(label) },
+                            trailingIcon = if (recurrence == value) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null,
+                            onClick = {
+                                recurrence = value
+                                repeatMenuExpanded = false
+                            }
+                        )
+                    }
                 }
             }
 
@@ -1132,12 +1259,16 @@ private fun TaskEditorSheet(
                             notes = notes.trim(),
                             important = important,
                             dueDate = dueDate,
+                            reminderAt = reminderAt,
+                            recurrence = recurrence,
                             listName = listName
                         ) ?: Task(
                             title = cleanTitle,
                             notes = notes.trim(),
                             important = important,
                             dueDate = dueDate,
+                            reminderAt = reminderAt,
+                            recurrence = recurrence,
                             listName = listName
                         ),
                         localSubtasks.mapIndexed { index, subtask ->
@@ -1547,6 +1678,13 @@ private fun isTodayOrOverdue(dueDate: Long?): Boolean {
 private fun formatDate(millis: Long): String {
     return SimpleDateFormat(
         "d MMM",
+        Locale("es", "ES")
+    ).format(Date(millis))
+}
+
+private fun formatReminder(millis: Long): String {
+    return SimpleDateFormat(
+        "d MMM, HH:mm",
         Locale("es", "ES")
     ).format(Date(millis))
 }
