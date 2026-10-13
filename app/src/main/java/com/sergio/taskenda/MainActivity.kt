@@ -989,14 +989,30 @@ private fun TaskEditorSheet(
                         )
                     }
 
+                    // Default to a future time. A due date is usually stored at midnight,
+                    // which previously made a same-day reminder silently expire before saving.
+                    val nowPlusFiveMinutes = System.currentTimeMillis() + 5 * 60 * 1000L
                     val initial = Calendar.getInstance().apply {
-                        timeInMillis = reminderAt ?: dueDate ?: System.currentTimeMillis()
+                        when {
+                            reminderAt != null -> timeInMillis = reminderAt!!
+                            dueDate != null -> {
+                                timeInMillis = dueDate!!
+                                val futureClock = Calendar.getInstance().apply {
+                                    timeInMillis = nowPlusFiveMinutes
+                                }
+                                set(Calendar.HOUR_OF_DAY, futureClock.get(Calendar.HOUR_OF_DAY))
+                                set(Calendar.MINUTE, futureClock.get(Calendar.MINUTE))
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            else -> timeInMillis = nowPlusFiveMinutes
+                        }
                     }
                     AndroidDatePickerDialog(
                         context,
                         { _, year, month, day ->
                             val selected = Calendar.getInstance().apply {
-                                timeInMillis = reminderAt ?: dueDate ?: System.currentTimeMillis()
+                                timeInMillis = initial.timeInMillis
                                 set(Calendar.YEAR, year)
                                 set(Calendar.MONTH, month)
                                 set(Calendar.DAY_OF_MONTH, day)
@@ -1032,6 +1048,13 @@ private fun TaskEditorSheet(
             }
 
             if (reminderAt != null) {
+                if (reminderAt!! <= System.currentTimeMillis()) {
+                    Text(
+                        text = "La fecha y hora del recordatorio ya han pasado. Elige una hora futura.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 TextButton(
                     onClick = { reminderAt = null },
                     modifier = Modifier.align(Alignment.End)
@@ -1276,7 +1299,7 @@ private fun TaskEditorSheet(
                         }
                     )
                 },
-                enabled = title.trim().isNotBlank(),
+                enabled = title.trim().isNotBlank() && (reminderAt == null || reminderAt!! > System.currentTimeMillis()),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(

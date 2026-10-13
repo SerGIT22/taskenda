@@ -40,7 +40,11 @@ object TaskReminderScheduler {
         val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
             ?: return
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarmManager.canScheduleExactAlarms()) {
+            // Use an exact alarm when Android has granted the special alarm-access permission.
+            // No special access is required for the inexact fallback below.
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
         } else {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pending)

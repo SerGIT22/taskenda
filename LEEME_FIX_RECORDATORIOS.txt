@@ -1,0 +1,14 @@
+Taskenda - corrección de recordatorios
+
+Sustituir solo estos dos archivos del proyecto actual:
+1) app/src/main/java/com/sergio/taskenda/MainActivity.kt
+2) app/src/main/java/com/sergio/taskenda/reminders/TaskReminderScheduler.kt
+
+No modificar .github ni sus workflows.
+
+Cambios:
+- El selector de recordatorios ya no toma por defecto la medianoche de la fecha de vencimiento, lo que podía dejar el recordatorio en el pasado.
+- Si la hora elegida ya pasó, se muestra un aviso y no se permite guardar ese recordatorio caducado.
+- Se usa alarma exacta si Android ya permite programarla; en caso contrario, se conserva la alarma inexacta compatible sin requerir acceso especial.
+
+No se ha podido ejecutar una compilación Android real en este entorno. Probar GitHub Actions antes de instalar el APK.
