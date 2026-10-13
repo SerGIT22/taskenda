@@ -64,6 +64,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
@@ -79,6 +82,8 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -199,6 +204,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
 
     // Filtro de fecha para separar hoy, mañana y tareas vencidas.
     var selectedDateFilter by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
+    var selectedSort by remember { mutableStateOf("Fecha") }
 
     var editorVisible by remember {
         mutableStateOf(false)
@@ -317,6 +325,52 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 )
             }
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp),
+                    placeholder = { Text("Buscar tareas") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Buscar")
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Borrar búsqueda")
+                            }
+                        }
+                    }
+                )
+                Box {
+                    IconButton(onClick = { sortMenuExpanded = true }) {
+                        Icon(Icons.Default.Sort, contentDescription = "Ordenar tareas")
+                    }
+                    DropdownMenu(
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false }
+                    ) {
+                        listOf("Fecha", "Importancia", "Nombre", "Creación").forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(if (selectedSort == option) "✓ $option" else option) },
+                                onClick = {
+                                    selectedSort = option
+                                    sortMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             if (selectedTab == 0) {
                 Row(
                     modifier = Modifier
@@ -373,8 +427,40 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         categoryTasks
                     }
 
-                    if (tabTasks.isEmpty()) {
-                        EmptyTasks(
+                    val displayedTasks = remember(tabTasks, searchQuery, selectedSort) {
+                        val query = searchQuery.trim()
+                        val searched = if (query.isEmpty()) tabTasks else tabTasks.filter { task ->
+                            task.title.contains(query, ignoreCase = true) ||
+                                task.notes.contains(query, ignoreCase = true)
+                        }
+                        when (selectedSort) {
+                            "Importancia" -> searched.sortedWith(
+                                compareByDescending<Task> { it.important }
+                                    .thenBy { it.dueDate ?: Long.MAX_VALUE }
+                                    .thenBy { it.createdAt }
+                            )
+                            "Nombre" -> searched.sortedBy { it.title.lowercase() }
+                            "Creación" -> searched.sortedByDescending { it.createdAt }
+                            else -> searched.sortedWith(
+                                compareBy<Task> { it.dueDate ?: Long.MAX_VALUE }
+                                    .thenBy { it.dueTime ?: "99:99" }
+                                    .thenByDescending { it.important }
+                            )
+                        }
+                    }
+
+                    if (displayedTasks.isEmpty()) {
+                        if (searchQuery.isNotBlank()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(8.dp))
+                                Text("No hay resultados", style = MaterialTheme.typography.titleMedium)
+                                Text("Prueba con otro término.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else EmptyTasks(
                             selectedTab = tab,
                             onCreate = {
                                 editingTask = null
@@ -393,7 +479,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             items(
-                                items = tabTasks,
+                                items = displayedTasks,
                                 key = { it.id }
                             ) { task ->
                                 TaskRow(
