@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -77,6 +78,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -195,6 +197,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
         mutableIntStateOf(0)
     }
 
+    // Filtro de fecha para separar hoy, mañana y tareas vencidas.
+    var selectedDateFilter by remember { mutableIntStateOf(0) }
+
     var editorVisible by remember {
         mutableStateOf(false)
     }
@@ -210,7 +215,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
     // Filter each section once per task/list update instead of recalculating during transitions.
     val tabTasksByCategory = remember(listTasks) {
         listOf(
-            listTasks.filter { !it.completed && isTodayOrOverdue(it.dueDate) },
+            listTasks.filter { !it.completed && it.dueDate != null },
             listTasks.filter { !it.completed },
             listTasks.filter { !it.completed && it.important },
             listTasks.filter { it.completed }
@@ -312,6 +317,33 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 )
             }
 
+            if (selectedTab == 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterChip(
+                        selected = selectedDateFilter == 0,
+                        onClick = { selectedDateFilter = 0 },
+                        label = { Text("Hoy") }
+                    )
+                    FilterChip(
+                        selected = selectedDateFilter == 1,
+                        onClick = { selectedDateFilter = 1 },
+                        label = { Text("Mañana") }
+                    )
+                    FilterChip(
+                        selected = selectedDateFilter == 2,
+                        onClick = { selectedDateFilter = 2 },
+                        label = { Text("Vencidas") }
+                    )
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -327,7 +359,19 @@ private fun TaskendaApp(vm: TaskViewModel) {
                     label = "taskenda_category_transition"
                 ) { tab ->
 
-                    val tabTasks = tabTasksByCategory.getOrElse(tab) { emptyList() }
+                    val categoryTasks = tabTasksByCategory.getOrElse(tab) { emptyList() }
+                    val tabTasks = if (tab == 0) {
+                        categoryTasks.filter { task ->
+                            when (selectedDateFilter) {
+                                0 -> isDueToday(task.dueDate)
+                                1 -> isDueTomorrow(task.dueDate)
+                                2 -> isOverdue(task.dueDate)
+                                else -> false
+                            }
+                        }
+                    } else {
+                        categoryTasks
+                    }
 
                     if (tabTasks.isEmpty()) {
                         EmptyTasks(
@@ -1709,14 +1753,25 @@ private fun TaskendaBottomItem(
 }
 
 private fun isTodayOrOverdue(dueDate: Long?): Boolean {
-    if (dueDate == null) return false
-
-    val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.ROOT)
-    val taskDate = dateFormat.format(Date(dueDate))
-    val today = dateFormat.format(Date())
-
-    return taskDate <= today
+    return isDueToday(dueDate) || isOverdue(dueDate)
 }
+
+private fun dayKey(millis: Long): String =
+    SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(Date(millis))
+
+private fun isDueToday(dueDate: Long?): Boolean =
+    dueDate != null && dayKey(dueDate) == dayKey(System.currentTimeMillis())
+
+private fun isDueTomorrow(dueDate: Long?): Boolean {
+    if (dueDate == null) return false
+    val tomorrow = java.util.Calendar.getInstance().apply {
+        add(java.util.Calendar.DAY_OF_YEAR, 1)
+    }.timeInMillis
+    return dayKey(dueDate) == dayKey(tomorrow)
+}
+
+private fun isOverdue(dueDate: Long?): Boolean =
+    dueDate != null && dayKey(dueDate) < dayKey(System.currentTimeMillis())
 
 private fun formatDate(millis: Long): String {
     return SimpleDateFormat(
