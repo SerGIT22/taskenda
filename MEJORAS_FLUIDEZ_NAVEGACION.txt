@@ -1,0 +1,13 @@
+TASKENDA — MEJORAS DE FLUIDEZ Y NAVEGACIÓN
+
+Cambios en esta versión:
+- Barra inferior con transiciones de color suaves para fondo, borde e iconos.
+- Etiqueta de la sección seleccionada entra y sale con expansión vertical y fade.
+- Conserva los cuatro destinos, el diseño flotante redondeado, los colores dinámicos y el feedback háptico.
+- Evita ejecutar el filtrado de las cuatro categorías repetidamente durante cada transición; las listas filtradas se memorizan hasta que cambian las tareas o la lista activa.
+- Reduce las transiciones de cabecera y contenido a 180 ms para dar una respuesta más ágil.
+- Conserva los recordatorios, las tareas recurrentes, las subtareas y la migración de base de datos presentes en la versión de referencia.
+- No se modifica .github/workflows/build.yml.
+
+IMPORTANTE
+No se ha podido ejecutar una compilación Android real en este entorno. Ejecuta GitHub Actions y confirma que el APK se construye antes de instalarlo. No desinstales la app ni borres sus datos.

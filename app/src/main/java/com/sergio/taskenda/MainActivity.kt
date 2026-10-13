@@ -20,6 +20,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -88,6 +92,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -99,6 +104,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -197,6 +204,16 @@ private fun TaskendaApp(vm: TaskViewModel) {
         tasks.filter { it.listName == selectedList }
     }
 
+    // Filter each section once per task/list update instead of recalculating during transitions.
+    val tabTasksByCategory = remember(listTasks) {
+        listOf(
+            listTasks.filter { !it.completed && isTodayOrOverdue(it.dueDate) },
+            listTasks.filter { !it.completed },
+            listTasks.filter { !it.completed && it.important },
+            listTasks.filter { it.completed }
+        )
+    }
+
     val headerTitle = when (selectedTab) {
         0 -> "Hoy"
         1 -> "Tareas"
@@ -259,7 +276,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
             Crossfade(
                 targetState = selectedTab,
                 animationSpec = tween(
-                    durationMillis = 220,
+                    durationMillis = 180,
                     easing = FastOutSlowInEasing
                 ),
                 label = "taskenda_header_transition"
@@ -307,15 +324,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                     label = "taskenda_category_transition"
                 ) { tab ->
 
-                    val tabTasks = when (tab) {
-                        0 -> listTasks.filter {
-                            !it.completed && isTodayOrOverdue(it.dueDate)
-                        }
-                        1 -> listTasks.filter { !it.completed }
-                        2 -> listTasks.filter { !it.completed && it.important }
-                        3 -> listTasks.filter { it.completed }
-                        else -> emptyList()
-                    }
+                    val tabTasks = tabTasksByCategory.getOrElse(tab) { emptyList() }
 
                     if (tabTasks.isEmpty()) {
                         EmptyTasks(
@@ -1558,72 +1567,51 @@ private fun TaskendaBottomBar(
 ) {
     val view = LocalView.current
     val colors = MaterialTheme.colorScheme
+    val barColor by animateColorAsState(
+        targetValue = colors.surfaceContainerHigh,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "taskenda_bar_color"
+    )
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
         shape = RoundedCornerShape(28.dp),
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
-        color = colors.surfaceContainerHigh
+        tonalElevation = 3.dp,
+        shadowElevation = 5.dp,
+        color = barColor
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .padding(horizontal = 4.dp, vertical = 3.dp),
+                .padding(horizontal = 5.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TaskendaBottomItem(
-                index = 0,
-                selectedTab = selectedTab,
-                label = "Hoy",
-                icon = Icons.Outlined.Event,
-                selectedIcon = Icons.Default.CalendarToday,
-                onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onTabSelected(0)
-                },
-                modifier = Modifier.weight(1f)
+            val destinations = listOf(
+                Triple("Hoy", Icons.Outlined.Event, Icons.Default.CalendarToday),
+                Triple("Tareas", Icons.Outlined.CheckCircle, Icons.Default.TaskAlt),
+                Triple("Importantes", Icons.Outlined.StarBorder, Icons.Default.Star),
+                Triple("Completadas", Icons.Outlined.CheckCircle, Icons.Default.CheckCircle)
             )
-            TaskendaBottomItem(
-                index = 1,
-                selectedTab = selectedTab,
-                label = "Tareas",
-                icon = Icons.Outlined.CheckCircle,
-                selectedIcon = Icons.Default.TaskAlt,
-                onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onTabSelected(1)
-                },
-                modifier = Modifier.weight(1f)
-            )
-            TaskendaBottomItem(
-                index = 2,
-                selectedTab = selectedTab,
-                label = "Importantes",
-                icon = Icons.Outlined.StarBorder,
-                selectedIcon = Icons.Default.Star,
-                onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onTabSelected(2)
-                },
-                modifier = Modifier.weight(1f)
-            )
-            TaskendaBottomItem(
-                index = 3,
-                selectedTab = selectedTab,
-                label = "Completadas",
-                icon = Icons.Outlined.CheckCircle,
-                selectedIcon = Icons.Default.CheckCircle,
-                onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onTabSelected(3)
-                },
-                modifier = Modifier.weight(1f)
-            )
+            destinations.forEachIndexed { index, destination ->
+                TaskendaBottomItem(
+                    index = index,
+                    selectedTab = selectedTab,
+                    label = destination.first,
+                    icon = destination.second,
+                    selectedIcon = destination.third,
+                    onClick = {
+                        if (selectedTab != index) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                            onTabSelected(index)
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
@@ -1633,56 +1621,78 @@ private fun TaskendaBottomItem(
     index: Int,
     selectedTab: Int,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
+    selectedIcon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val selected = selectedTab == index
     val shape = RoundedCornerShape(22.dp)
     val colors = MaterialTheme.colorScheme
-
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) colors.primaryContainer else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "taskenda_nav_background_$index"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "taskenda_nav_content_$index"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) colors.primary.copy(alpha = 0.72f) else Color.Transparent,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "taskenda_nav_border_$index"
+    )
     Column(
         modifier = modifier
             .height(60.dp)
             .padding(horizontal = 2.dp)
             .clip(shape)
-            .background(
-                color = if (selected) colors.primaryContainer else Color.Transparent,
+            .background(backgroundColor, shape)
+            .border(
+                width = if (selected) 1.25.dp else 0.dp,
+                color = borderColor,
                 shape = shape
             )
-            .then(
-                if (selected) Modifier.border(
-                    width = 1.5.dp,
-                    color = colors.primary,
-                    shape = shape
-                ) else Modifier
-            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 3.dp, vertical = 3.dp),
+            .padding(horizontal = 2.dp, vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = if (selected) selectedIcon else icon,
-            contentDescription = label,
-            tint = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
-        )
+        Crossfade(
+            targetState = selected,
+            animationSpec = tween(150, easing = FastOutSlowInEasing),
+            label = "taskenda_nav_icon_transition_$index"
+        ) { isSelected ->
+            Icon(
+                imageVector = if (isSelected) selectedIcon else icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
         AnimatedVisibility(
             visible = selected,
-            enter = fadeIn(animationSpec = tween(140)),
-            exit = fadeOut(animationSpec = tween(90))
+            enter = fadeIn(tween(130)) + expandVertically(
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                expandFrom = Alignment.Top
+            ),
+            exit = fadeOut(tween(90)) + shrinkVertically(
+                animationSpec = tween(100, easing = FastOutSlowInEasing),
+                shrinkTowards = Alignment.Top
+            )
         ) {
             Text(
                 text = label,
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Clip,
-                color = colors.onPrimaryContainer,
+                color = contentColor,
                 fontSize = 10.sp,
                 lineHeight = 12.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 1.dp)
             )
         }
     }
