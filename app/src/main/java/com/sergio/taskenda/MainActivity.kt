@@ -241,6 +241,9 @@ private fun TaskendaApp(vm: TaskViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf("Fecha") }
+    var onlyImportant by remember { mutableStateOf(false) }
+    var onlyWithSubtasks by remember { mutableStateOf(false) }
+    var onlyWithDate by remember { mutableStateOf(false) }
 
     var editorVisible by remember {
         mutableStateOf(false)
@@ -416,6 +419,31 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 }
             }
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected = onlyImportant,
+                    onClick = { onlyImportant = !onlyImportant },
+                    label = { Text("Importantes") }
+                )
+                FilterChip(
+                    selected = onlyWithSubtasks,
+                    onClick = { onlyWithSubtasks = !onlyWithSubtasks },
+                    label = { Text("Con subtareas") }
+                )
+                FilterChip(
+                    selected = onlyWithDate,
+                    onClick = { onlyWithDate = !onlyWithDate },
+                    label = { Text("Con fecha") }
+                )
+            }
+
             if (selectedTab == 0) {
                 Row(
                     modifier = Modifier
@@ -472,21 +500,32 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         categoryTasks
                     }
 
-                    val displayedTasks = remember(tabTasks, searchQuery, selectedSort) {
+                    val displayedTasks = remember(
+                        tabTasks,
+                        searchQuery,
+                        selectedSort,
+                        onlyImportant,
+                        onlyWithSubtasks,
+                        onlyWithDate,
+                        subtasksByTask
+                    ) {
                         val query = searchQuery.trim()
-                        val searched = if (query.isEmpty()) tabTasks else tabTasks.filter { task ->
-                            task.title.contains(query, ignoreCase = true) ||
-                                task.notes.contains(query, ignoreCase = true)
+                        val filtered = tabTasks.filter { task ->
+                            (query.isEmpty() || task.title.contains(query, ignoreCase = true) ||
+                                task.notes.contains(query, ignoreCase = true)) &&
+                                (!onlyImportant || task.important) &&
+                                (!onlyWithSubtasks || !subtasksByTask[task.id].isNullOrEmpty()) &&
+                                (!onlyWithDate || task.dueDate != null)
                         }
                         when (selectedSort) {
-                            "Importancia" -> searched.sortedWith(
+                            "Importancia" -> filtered.sortedWith(
                                 compareByDescending<Task> { it.important }
                                     .thenBy { it.dueDate ?: Long.MAX_VALUE }
                                     .thenBy { it.createdAt }
                             )
-                            "Nombre" -> searched.sortedBy { it.title.lowercase() }
-                            "Creación" -> searched.sortedByDescending { it.createdAt }
-                            else -> searched.sortedWith(
+                            "Nombre" -> filtered.sortedBy { it.title.lowercase() }
+                            "Creación" -> filtered.sortedByDescending { it.createdAt }
+                            else -> filtered.sortedWith(
                                 compareBy<Task> { it.dueDate ?: Long.MAX_VALUE }
                                     .thenBy { it.dueTime ?: "99:99" }
                                     .thenByDescending { it.important }
@@ -495,7 +534,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                     }
 
                     if (displayedTasks.isEmpty()) {
-                        if (searchQuery.isNotBlank()) {
+                        if (searchQuery.isNotBlank() || onlyImportant || onlyWithSubtasks || onlyWithDate) {
                             Column(
                                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
@@ -503,7 +542,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
                                 Text("No hay resultados", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                                Text("Prueba con otro término.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Cambia la búsqueda o desactiva algún filtro.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         } else EmptyTasks(
                             selectedTab = tab,
