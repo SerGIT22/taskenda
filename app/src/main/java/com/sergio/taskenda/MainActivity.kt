@@ -107,6 +107,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -1340,9 +1341,7 @@ private fun TaskEditorSheet(
 
             if (localSubtasks.isNotEmpty()) {
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize(),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -1373,10 +1372,9 @@ private fun TaskEditorSheet(
                         }
 
                         localSubtasks.forEachIndexed { index, subtask ->
+                            key(subtask.id.takeIf { it != 0L } ?: index.toLong()) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .animateContentSize(),
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TaskCheckbox(
@@ -1392,6 +1390,10 @@ private fun TaskEditorSheet(
 
                                 val subtaskTextColor by animateColorAsState(
                                     targetValue = if (subtask.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
                                     label = "subtaskTextColor"
                                 )
                                 Text(
@@ -1440,6 +1442,7 @@ private fun TaskEditorSheet(
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Eliminar subtarea")
                                 }
+                            }
                             }
                         }
                     }
