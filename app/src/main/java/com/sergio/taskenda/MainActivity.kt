@@ -15,7 +15,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -28,8 +27,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
+import x.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +65,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
@@ -242,6 +241,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
     var selectedDateFilter by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var filtersMenuExpanded by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf("Fecha") }
     var onlyImportant by remember { mutableStateOf(false) }
     var onlyWithSubtasks by remember { mutableStateOf(false) }
@@ -262,7 +262,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
     // Filter each section once per task/list update instead of recalculating during transitions.
     val tabTasksByCategory = remember(listTasks) {
         listOf(
-            listTasks.filter { !it.completed && it.dueDate != null },
+            listTasks.filter { !it.completed },
             listTasks.filter { !it.completed },
             listTasks.filter { !it.completed && it.important },
             listTasks.filter { it.completed }
@@ -401,6 +401,44 @@ private fun TaskendaApp(vm: TaskViewModel) {
                     }
                 )
                 Box {
+                    IconButton(onClick = { filtersMenuExpanded = true }) {
+                        Icon(
+                            Icons.Default.FilterList,
+                            contentDescription = "Filtrar tareas",
+                            tint = if (onlyImportant || onlyWithSubtasks || onlyWithDate)
+                                MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = filtersMenuExpanded,
+                        onDismissRequest = { filtersMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (onlyImportant) "✓ Importantes" else "Importantes") },
+                            onClick = { onlyImportant = !onlyImportant }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (onlyWithSubtasks) "✓ Con subtareas" else "Con subtareas") },
+                            onClick = { onlyWithSubtasks = !onlyWithSubtasks }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (onlyWithDate) "✓ Con fecha" else "Con fecha") },
+                            onClick = { onlyWithDate = !onlyWithDate }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Quitar filtros") },
+                            enabled = onlyImportant || onlyWithSubtasks || onlyWithDate,
+                            onClick = {
+                                onlyImportant = false
+                                onlyWithSubtasks = false
+                                onlyWithDate = false
+                                filtersMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+                Box {
                     IconButton(onClick = { sortMenuExpanded = true }) {
                         Icon(Icons.Default.Sort, contentDescription = "Ordenar tareas")
                     }
@@ -419,31 +457,6 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         }
                     }
                 }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilterChip(
-                    selected = onlyImportant,
-                    onClick = { onlyImportant = !onlyImportant },
-                    label = { Text("Importantes") }
-                )
-                FilterChip(
-                    selected = onlyWithSubtasks,
-                    onClick = { onlyWithSubtasks = !onlyWithSubtasks },
-                    label = { Text("Con subtareas") }
-                )
-                FilterChip(
-                    selected = onlyWithDate,
-                    onClick = { onlyWithDate = !onlyWithDate },
-                    label = { Text("Con fecha") }
-                )
             }
 
             if (selectedTab == 0) {
@@ -470,6 +483,11 @@ private fun TaskendaApp(vm: TaskViewModel) {
                         onClick = { selectedDateFilter = 2 },
                         label = { Text("Vencidas") }
                     )
+                    FilterChip(
+                        selected = selectedDateFilter == 3,
+                        onClick = { selectedDateFilter = 3 },
+                        label = { Text("Todas") }
+                    )
                 }
             }
 
@@ -495,6 +513,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                                 0 -> isDueToday(task.dueDate)
                                 1 -> isDueTomorrow(task.dueDate)
                                 2 -> isOverdue(task.dueDate)
+                                3 -> true
                                 else -> false
                             }
                         }
