@@ -92,6 +92,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -162,14 +163,47 @@ class MainActivity : ComponentActivity() {
             val darkTheme = isSystemInDarkTheme()
             val context = LocalContext.current
 
+            // Conserva los colores dinámicos del sistema, pero fija los colores
+            // semánticos del tema oscuro para impedir texto oscuro sobre superficies oscuras.
             val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (darkTheme) {
-                    dynamicDarkColorScheme(context)
+                    dynamicDarkColorScheme(context).copy(
+                        background = Color(0xFF160A07),
+                        onBackground = Color(0xFFFFF7F3),
+                        surface = Color(0xFF21110D),
+                        onSurface = Color(0xFFFFF7F3),
+                        surfaceVariant = Color(0xFF39221B),
+                        onSurfaceVariant = Color(0xFFE5CFC6),
+                        outline = Color(0xFFB99A8E),
+                        outlineVariant = Color(0xFF6C4B40),
+                        surfaceContainerLowest = Color(0xFF100604),
+                        surfaceContainerLow = Color(0xFF1B0D09),
+                        surfaceContainer = Color(0xFF24130E),
+                        surfaceContainerHigh = Color(0xFF2D1913),
+                        surfaceContainerHighest = Color(0xFF39221B)
+                    )
                 } else {
                     dynamicLightColorScheme(context)
                 }
             } else {
-                if (darkTheme) darkColorScheme() else lightColorScheme()
+                if (darkTheme) {
+                    darkColorScheme(
+                        primary = Color(0xFFFFB4A3),
+                        onPrimary = Color(0xFF561F13),
+                        primaryContainer = Color(0xFF733426),
+                        onPrimaryContainer = Color(0xFFFFDAD1),
+                        secondary = Color(0xFFE7BDB1),
+                        onSecondary = Color(0xFF442A23),
+                        background = Color(0xFF160A07),
+                        onBackground = Color(0xFFFFF7F3),
+                        surface = Color(0xFF21110D),
+                        onSurface = Color(0xFFFFF7F3),
+                        surfaceVariant = Color(0xFF39221B),
+                        onSurfaceVariant = Color(0xFFE5CFC6),
+                        outline = Color(0xFFB99A8E),
+                        outlineVariant = Color(0xFF6C4B40)
+                    )
+                } else lightColorScheme()
             }
 
             MaterialTheme(colorScheme = colorScheme) {
@@ -338,7 +372,18 @@ private fun TaskendaApp(vm: TaskViewModel) {
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp),
-                    placeholder = { Text("Buscar tareas") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    ),
+                    placeholder = { Text("Buscar tareas", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = "Buscar")
                     },
@@ -457,11 +502,7 @@ private fun TaskendaApp(vm: TaskViewModel) {
                             ) {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
-                                Text(
-                                    "No hay resultados",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                Text("No hay resultados", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                                 Text("Prueba con otro término.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         } else EmptyTasks(
@@ -586,7 +627,6 @@ private fun TaskendaHeader(
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -690,7 +730,6 @@ private fun EmptyTasks(
                     else -> "No tienes tareas pendientes"
                 },
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
