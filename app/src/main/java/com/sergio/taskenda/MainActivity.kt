@@ -88,6 +88,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
@@ -1095,18 +1096,23 @@ private fun TaskEditorSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        dragHandle = null,
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxHeight(0.96f)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
                 .padding(
-                    start = 20.dp,
-                    end = 20.dp,
-                    bottom = 28.dp
+                    start = 14.dp,
+                    end = 14.dp,
+                    top = 10.dp,
+                    bottom = 16.dp
                 ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = if (task == null) "Nueva tarea" else "Editar tarea",
@@ -1127,7 +1133,7 @@ private fun TaskEditorSheet(
                 value = notes,
                 onValueChange = { notes = it },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
+                minLines = 2,
                 maxLines = 5,
                 label = { Text("Notas") },
                 placeholder = { Text("Añade información opcional") }
@@ -1343,8 +1349,8 @@ private fun TaskEditorSheet(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1574,7 +1580,7 @@ private fun TaskListManagerSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
