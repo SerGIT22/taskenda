@@ -1340,7 +1340,9 @@ private fun TaskEditorSheet(
 
             if (localSubtasks.isNotEmpty()) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(),
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -1372,7 +1374,9 @@ private fun TaskEditorSheet(
 
                         localSubtasks.forEachIndexed { index, subtask ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .animateContentSize(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TaskCheckbox(
@@ -1386,12 +1390,16 @@ private fun TaskEditorSheet(
 
                                 Spacer(Modifier.width(6.dp))
 
+                                val subtaskTextColor by animateColorAsState(
+                                    targetValue = if (subtask.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    label = "subtaskTextColor"
+                                )
                                 Text(
                                     text = subtask.title,
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium,
                                     textDecoration = if (subtask.completed) TextDecoration.LineThrough else TextDecoration.None,
-                                    color = if (subtask.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                    color = subtaskTextColor
                                 )
 
                                 IconButton(
