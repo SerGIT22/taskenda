@@ -1825,8 +1825,7 @@ private fun TaskDatePickerDialog(
 }
 
 @Composable
-private @Composable
-fun TaskendaBottomBar(
+private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
