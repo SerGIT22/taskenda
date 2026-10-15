@@ -16,6 +16,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -109,6 +110,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -1856,62 +1858,63 @@ private fun TaskendaBottomBar(
             val slotWidth = maxWidth / destinations.size
             val capsuleWidth = slotWidth - 4.dp
             val density = androidx.compose.ui.platform.LocalDensity.current
-            val targetOffsetPx = with(density) { (slotWidth * safeSelectedTab + 2.dp).toPx() }
-            val animatedOffsetPx by animateFloatAsState(
-                targetValue = targetOffsetPx,
-                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-                label = "taskenda_nav_indicator_x"
-            )
+            val initialOffsetPx = with(density) { (slotWidth * safeSelectedTab + 2.dp).toPx() }
 
-            // La cápsula se mueve en píxeles; el contenido de los cuatro destinos
-            // mantiene su posición y no provoca relayout durante la transición.
+            // Una sola cápsula. El contenido seleccionado NO cambia mientras la
+            // cápsula viaja: así evitamos iconos duplicados, fantasmas y cambios
+            // adelantados de etiqueta respecto al movimiento.
+            val indicatorOffset = remember { Animatable(initialOffsetPx) }
+            var capsuleTab by remember { mutableIntStateOf(safeSelectedTab) }
+
+            LaunchedEffect(safeSelectedTab, slotWidth) {
+                val targetOffsetPx = with(density) {
+                    (slotWidth * safeSelectedTab + 2.dp).toPx()
+                }
+                indicatorOffset.animateTo(
+                    targetValue = targetOffsetPx,
+                    animationSpec = tween(
+                        durationMillis = 260,
+                        easing = FastOutSlowInEasing
+                    )
+                )
+                capsuleTab = safeSelectedTab
+            }
+
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .graphicsLayer { translationX = animatedOffsetPx }
+                    .graphicsLayer { translationX = indicatorOffset.value }
                     .width(capsuleWidth)
                     .height(52.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(colors.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                androidx.compose.animation.AnimatedContent(
-                    targetState = safeSelectedTab,
-                    transitionSpec = {
-                        androidx.compose.animation.fadeIn(
-                            animationSpec = tween(130, easing = FastOutSlowInEasing)
-                        ) togetherWith androidx.compose.animation.fadeOut(
-                            animationSpec = tween(90, easing = FastOutSlowInEasing)
-                        )
-                    },
-                    label = "taskenda_nav_selected_content"
-                ) { destinationIndex ->
-                    val destination = destinations[destinationIndex]
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = destination.third,
-                            contentDescription = destination.first,
-                            tint = colors.onPrimaryContainer,
-                            modifier = Modifier.size(23.dp)
-                        )
-                        Spacer(Modifier.height(1.dp))
-                        Text(
-                            text = destination.first,
-                            color = colors.onPrimaryContainer,
-                            fontSize = 12.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip
-                        )
-                    }
+                val destination = destinations[capsuleTab]
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 1.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = destination.third,
+                        contentDescription = destination.first,
+                        tint = colors.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        text = destination.first,
+                        color = colors.onPrimaryContainer,
+                        fontSize = 13.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip
+                    )
                 }
             }
 
@@ -1927,7 +1930,6 @@ private fun TaskendaBottomBar(
                             .clip(RoundedCornerShape(24.dp))
                             .clickable {
                                 if (safeSelectedTab != index) {
-                                    // Misma respuesta háptica usada en Diario.
                                     haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                     haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
                                     onTabSelected(index)
@@ -1935,12 +1937,14 @@ private fun TaskendaBottomBar(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (safeSelectedTab != index) {
+                        // El icono inactivo permanece visible hasta que la
+                        // cápsula llega a su destino. Nunca desaparece antes.
+                        if (capsuleTab != index) {
                             Icon(
                                 imageVector = destination.second,
                                 contentDescription = destination.first,
-                                tint = colors.onSurfaceVariant,
-                                modifier = Modifier.size(23.dp)
+                                tint = colors.onSurface,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
