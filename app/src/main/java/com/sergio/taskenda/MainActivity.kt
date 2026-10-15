@@ -1825,7 +1825,8 @@ private fun TaskDatePickerDialog(
 }
 
 @Composable
-private fun TaskendaBottomBar(
+private @Composable
+fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
@@ -1857,97 +1858,119 @@ private fun TaskendaBottomBar(
         ) {
             val slotWidth = maxWidth / destinations.size
             val capsuleWidth = slotWidth - 4.dp
-            val density = androidx.compose.ui.platform.LocalDensity.current
-            val initialOffsetPx = with(density) { (slotWidth * safeSelectedTab + 2.dp).toPx() }
 
-            // La cápsula es el único elemento seleccionado y se desplaza en
-            // una sola animación. El contenido cambia al iniciar el movimiento,
-            // de modo que el icono activo y su etiqueta viajan juntos; no hay
-            // una segunda cápsula ni iconos seleccionados superpuestos.
-            val indicatorOffset = remember { Animatable(initialOffsetPx) }
-
-            LaunchedEffect(safeSelectedTab, slotWidth) {
-                val targetOffsetPx = with(density) {
-                    (slotWidth * safeSelectedTab + 2.dp).toPx()
-                }
-                indicatorOffset.animateTo(
-                    targetValue = targetOffsetPx,
-                    animationSpec = tween(
-                        durationMillis = 240,
-                        easing = FastOutSlowInEasing
-                    )
-                )
-            }
+            // Igual que Diario: la cápsula se desplaza por detrás de cuatro
+            // destinos estables. Solo se anima su traslación, no su tamaño.
+            val indicatorX by animateDpAsState(
+                targetValue = slotWidth * safeSelectedTab + 2.dp,
+                animationSpec = tween(
+                    durationMillis = 300,
+                    easing = FastOutSlowInEasing
+                ),
+                label = "taskenda_bottom_nav_indicator"
+            )
 
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .graphicsLayer { translationX = indicatorOffset.value }
+                    .offset(x = indicatorX)
                     .width(capsuleWidth)
                     .height(52.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(colors.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                val destination = destinations[safeSelectedTab]
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 1.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = destination.third,
-                        contentDescription = destination.first,
-                        tint = colors.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.height(1.dp))
-                    Text(
-                        text = destination.first,
-                        color = colors.onPrimaryContainer,
-                        fontSize = 12.sp,
-                        lineHeight = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip
-                    )
-                }
-            }
+                    .background(colors.primaryContainer)
+            )
 
             Row(
                 modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 destinations.forEachIndexed { index, destination ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(24.dp))
-                            .clickable {
-                                if (safeSelectedTab != index) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
-                                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                                    onTabSelected(index)
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // El icono inactivo permanece visible hasta que la
-                        // cápsula llega a su destino. Nunca desaparece antes.
-                        if (safeSelectedTab != index) {
-                            Icon(
-                                imageVector = destination.second,
-                                contentDescription = destination.first,
-                                tint = colors.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
+                    TaskendaNavItem(
+                        modifier = Modifier.weight(1f),
+                        selected = safeSelectedTab == index,
+                        inactiveIcon = destination.second,
+                        activeIcon = destination.third,
+                        label = destination.first,
+                        onClick = {
+                            if (safeSelectedTab != index) {
+                                haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                                haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                                onTabSelected(index)
+                            }
                         }
-                    }
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskendaNavItem(
+    modifier: Modifier = Modifier,
+    selected: Boolean,
+    inactiveIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    activeIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(vertical = 4.dp, horizontal = 2.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        // Copia el comportamiento de Diario: el icono y la etiqueta cambian
+        // dentro de cada espacio fijo mediante fade + scale, sincronizados
+        // con la cápsula que viaja por detrás.
+        AnimatedContent(
+            targetState = selected,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(180)) +
+                    androidx.compose.animation.scaleIn(
+                        initialScale = 0.88f,
+                        animationSpec = tween(220)
+                    )) togetherWith
+                    (fadeOut(animationSpec = tween(120)) +
+                        androidx.compose.animation.scaleOut(
+                            targetScale = 0.88f,
+                            animationSpec = tween(160)
+                        ))
+            },
+            label = "taskenda_bottom_nav_item"
+        ) { isSelected ->
+            if (isSelected) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = activeIcon,
+                        contentDescription = label,
+                        modifier = Modifier.size(24.dp),
+                        tint = colors.onPrimaryContainer
+                    )
+                    Text(
+                        text = label,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        color = colors.onPrimaryContainer
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = inactiveIcon,
+                    contentDescription = label,
+                    modifier = Modifier.size(24.dp),
+                    tint = colors.onSurfaceVariant
+                )
             }
         }
     }
