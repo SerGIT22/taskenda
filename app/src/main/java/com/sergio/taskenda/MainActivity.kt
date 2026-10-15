@@ -13,6 +13,7 @@ import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -1828,6 +1829,13 @@ private fun TaskendaBottomBar(
 ) {
     val haptic = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
+    val destinations = listOf(
+        Triple("Hoy", Icons.Outlined.Event, Icons.Default.CalendarToday),
+        Triple("Tareas", Icons.Outlined.CheckCircle, Icons.Default.TaskAlt),
+        Triple("Importantes", Icons.Outlined.StarBorder, Icons.Default.Star),
+        Triple("Completadas", Icons.Outlined.CheckCircle, Icons.Default.CheckCircle)
+    )
+    val safeSelectedTab = selectedTab.coerceIn(0, destinations.lastIndex)
 
     Surface(
         modifier = Modifier
@@ -1845,30 +1853,18 @@ private fun TaskendaBottomBar(
                 .height(68.dp)
                 .padding(horizontal = 5.dp, vertical = 4.dp)
         ) {
-            val destinations = listOf(
-                Triple("Hoy", Icons.Outlined.Event, Icons.Default.CalendarToday),
-                Triple("Tareas", Icons.Outlined.CheckCircle, Icons.Default.TaskAlt),
-                Triple("Importantes", Icons.Outlined.StarBorder, Icons.Default.Star),
-                Triple("Completadas", Icons.Outlined.CheckCircle, Icons.Default.CheckCircle)
-            )
             val slotWidth = maxWidth / destinations.size
             val capsuleWidth = slotWidth - 4.dp
-
-            // Igual que Diario: solo se desplaza la cápsula en píxeles.
-            // Los cuatro espacios permanecen fijos para evitar relayouts y tirones.
             val density = androidx.compose.ui.platform.LocalDensity.current
-            val targetOffsetPx = with(density) {
-                (slotWidth * selectedTab + 2.dp).toPx()
-            }
+            val targetOffsetPx = with(density) { (slotWidth * safeSelectedTab + 2.dp).toPx() }
             val animatedOffsetPx by animateFloatAsState(
                 targetValue = targetOffsetPx,
-                animationSpec = tween(
-                    durationMillis = 180,
-                    easing = FastOutSlowInEasing
-                ),
+                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
                 label = "taskenda_nav_indicator_x"
             )
 
+            // La cápsula se mueve en píxeles; el contenido de los cuatro destinos
+            // mantiene su posición y no provoca relayout durante la transición.
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -1879,31 +1875,43 @@ private fun TaskendaBottomBar(
                     .background(colors.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 1.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val selectedDestination = destinations[selectedTab.coerceIn(0, destinations.lastIndex)]
-                    Icon(
-                        imageVector = selectedDestination.third,
-                        contentDescription = selectedDestination.first,
-                        tint = colors.onPrimaryContainer,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        text = selectedDestination.first,
-                        color = colors.onPrimaryContainer,
-                        fontSize = 8.sp,
-                        lineHeight = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip
-                    )
+                androidx.compose.animation.AnimatedContent(
+                    targetState = safeSelectedTab,
+                    transitionSpec = {
+                        androidx.compose.animation.fadeIn(
+                            animationSpec = tween(130, easing = FastOutSlowInEasing)
+                        ) togetherWith androidx.compose.animation.fadeOut(
+                            animationSpec = tween(90, easing = FastOutSlowInEasing)
+                        )
+                    },
+                    label = "taskenda_nav_selected_content"
+                ) { destinationIndex ->
+                    val destination = destinations[destinationIndex]
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = destination.third,
+                            contentDescription = destination.first,
+                            tint = colors.onPrimaryContainer,
+                            modifier = Modifier.size(23.dp)
+                        )
+                        Spacer(Modifier.height(1.dp))
+                        Text(
+                            text = destination.first,
+                            color = colors.onPrimaryContainer,
+                            fontSize = 12.sp,
+                            lineHeight = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip
+                        )
+                    }
                 }
             }
 
@@ -1918,8 +1926,8 @@ private fun TaskendaBottomBar(
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(24.dp))
                             .clickable {
-                                if (selectedTab != index) {
-                                    // Mismo patrón de respuesta háptica que Diario.
+                                if (safeSelectedTab != index) {
+                                    // Misma respuesta háptica usada en Diario.
                                     haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                     haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
                                     onTabSelected(index)
@@ -1927,12 +1935,12 @@ private fun TaskendaBottomBar(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (selectedTab != index) {
+                        if (safeSelectedTab != index) {
                             Icon(
                                 imageVector = destination.second,
                                 contentDescription = destination.first,
                                 tint = colors.onSurfaceVariant,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(23.dp)
                             )
                         }
                     }
