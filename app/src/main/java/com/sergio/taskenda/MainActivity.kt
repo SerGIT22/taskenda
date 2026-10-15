@@ -1860,11 +1860,11 @@ private fun TaskendaBottomBar(
             val density = androidx.compose.ui.platform.LocalDensity.current
             val initialOffsetPx = with(density) { (slotWidth * safeSelectedTab + 2.dp).toPx() }
 
-            // Una sola cápsula. El contenido seleccionado NO cambia mientras la
-            // cápsula viaja: así evitamos iconos duplicados, fantasmas y cambios
-            // adelantados de etiqueta respecto al movimiento.
+            // La cápsula es el único elemento seleccionado y se desplaza en
+            // una sola animación. El contenido cambia al iniciar el movimiento,
+            // de modo que el icono activo y su etiqueta viajan juntos; no hay
+            // una segunda cápsula ni iconos seleccionados superpuestos.
             val indicatorOffset = remember { Animatable(initialOffsetPx) }
-            var capsuleTab by remember { mutableIntStateOf(safeSelectedTab) }
 
             LaunchedEffect(safeSelectedTab, slotWidth) {
                 val targetOffsetPx = with(density) {
@@ -1873,11 +1873,10 @@ private fun TaskendaBottomBar(
                 indicatorOffset.animateTo(
                     targetValue = targetOffsetPx,
                     animationSpec = tween(
-                        durationMillis = 260,
+                        durationMillis = 240,
                         easing = FastOutSlowInEasing
                     )
                 )
-                capsuleTab = safeSelectedTab
             }
 
             Box(
@@ -1890,7 +1889,7 @@ private fun TaskendaBottomBar(
                     .background(colors.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                val destination = destinations[capsuleTab]
+                val destination = destinations[safeSelectedTab]
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1908,9 +1907,9 @@ private fun TaskendaBottomBar(
                     Text(
                         text = destination.first,
                         color = colors.onPrimaryContainer,
-                        fontSize = 13.sp,
-                        lineHeight = 15.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        lineHeight = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Clip
@@ -1939,7 +1938,7 @@ private fun TaskendaBottomBar(
                     ) {
                         // El icono inactivo permanece visible hasta que la
                         // cápsula llega a su destino. Nunca desaparece antes.
-                        if (capsuleTab != index) {
+                        if (safeSelectedTab != index) {
                             Icon(
                                 imageVector = destination.second,
                                 contentDescription = destination.first,
