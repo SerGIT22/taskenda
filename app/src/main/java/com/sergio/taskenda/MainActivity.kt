@@ -17,6 +17,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -119,9 +120,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -1822,7 +1826,7 @@ private fun TaskendaBottomBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
-    val view = LocalView.current
+    val haptic = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
 
     Surface(
@@ -1847,117 +1851,93 @@ private fun TaskendaBottomBar(
                 Triple("Importantes", Icons.Outlined.StarBorder, Icons.Default.Star),
                 Triple("Completadas", Icons.Outlined.CheckCircle, Icons.Default.CheckCircle)
             )
-            val itemWidth = maxWidth / destinations.size
-            val indicatorWidth = itemWidth - 4.dp
-            val indicatorOffset by animateDpAsState(
-                targetValue = itemWidth * selectedTab + 2.dp,
-                animationSpec = spring(
-                    dampingRatio = 0.78f,
-                    stiffness = Spring.StiffnessMediumLow
+            val slotWidth = maxWidth / destinations.size
+            val capsuleWidth = slotWidth - 4.dp
+
+            // Igual que Diario: solo se desplaza la cápsula en píxeles.
+            // Los cuatro espacios permanecen fijos para evitar relayouts y tirones.
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val targetOffsetPx = with(density) {
+                (slotWidth * selectedTab + 2.dp).toPx()
+            }
+            val animatedOffsetPx by animateFloatAsState(
+                targetValue = targetOffsetPx,
+                animationSpec = tween(
+                    durationMillis = 180,
+                    easing = FastOutSlowInEasing
                 ),
-                label = "taskenda_nav_indicator_offset"
+                label = "taskenda_nav_indicator_x"
             )
 
-            // Una única cápsula se desplaza entre destinos, como en Diario.
-            // No se dibuja borde individual alrededor de cada botón.
-            Surface(
+            Box(
                 modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(indicatorWidth)
+                    .align(Alignment.CenterStart)
+                    .graphicsLayer { translationX = animatedOffsetPx }
+                    .width(capsuleWidth)
                     .height(52.dp)
-                    .align(Alignment.CenterStart),
-                shape = RoundedCornerShape(24.dp),
-                color = colors.primary,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
-            ) {}
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(colors.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 1.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val selectedDestination = destinations[selectedTab.coerceIn(0, destinations.lastIndex)]
+                    Icon(
+                        imageVector = selectedDestination.third,
+                        contentDescription = selectedDestination.first,
+                        tint = colors.onPrimaryContainer,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        text = selectedDestination.first,
+                        color = colors.onPrimaryContainer,
+                        fontSize = 8.sp,
+                        lineHeight = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip
+                    )
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 destinations.forEachIndexed { index, destination ->
-                    TaskendaBottomItem(
-                        index = index,
-                        selectedTab = selectedTab,
-                        label = destination.first,
-                        icon = destination.second,
-                        selectedIcon = destination.third,
-                        onClick = {
-                            if (selectedTab != index) {
-                                view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                                onTabSelected(index)
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(24.dp))
+                            .clickable {
+                                if (selectedTab != index) {
+                                    // Mismo patrón de respuesta háptica que Diario.
+                                    haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                                    onTabSelected(index)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selectedTab != index) {
+                            Icon(
+                                imageVector = destination.second,
+                                contentDescription = destination.first,
+                                tint = colors.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun TaskendaBottomItem(
-    index: Int,
-    selectedTab: Int,
-    label: String,
-    icon: ImageVector,
-    selectedIcon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val selected = selectedTab == index
-    val colors = MaterialTheme.colorScheme
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) colors.onPrimary else colors.onSurfaceVariant,
-        animationSpec = tween(160, easing = FastOutSlowInEasing),
-        label = "taskenda_nav_content_$index"
-    )
-
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 2.dp, vertical = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Crossfade(
-            targetState = selected,
-            animationSpec = tween(150, easing = FastOutSlowInEasing),
-            label = "taskenda_nav_icon_transition_$index"
-        ) { isSelected ->
-            Icon(
-                imageVector = if (isSelected) selectedIcon else icon,
-                contentDescription = label,
-                tint = contentColor,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        AnimatedVisibility(
-            visible = selected,
-            enter = fadeIn(tween(140)) + expandVertically(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                expandFrom = Alignment.Top
-            ),
-            exit = fadeOut(tween(100)) + shrinkVertically(
-                animationSpec = tween(110, easing = FastOutSlowInEasing),
-                shrinkTowards = Alignment.Top
-            )
-        ) {
-            Text(
-                text = label,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-                color = contentColor,
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 1.dp)
-            )
         }
     }
 }
