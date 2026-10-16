@@ -16,7 +16,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -110,7 +109,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -1858,12 +1856,12 @@ private fun TaskendaBottomBar(
             val slotWidth = maxWidth / destinations.size
             val capsuleWidth = slotWidth - 4.dp
 
-            // Igual que Diario: la cápsula se desplaza por detrás de cuatro
-            // destinos estables. Solo se anima su traslación, no su tamaño.
+            // Un único indicador compartido por los cuatro destinos.
+            // 180 ms reduce la sensación de retraso al cambiar de pestaña.
             val indicatorX by animateDpAsState(
                 targetValue = slotWidth * safeSelectedTab + 2.dp,
                 animationSpec = tween(
-                    durationMillis = 300,
+                    durationMillis = 180,
                     easing = FastOutSlowInEasing
                 ),
                 label = "taskenda_bottom_nav_indicator"
@@ -1884,92 +1882,71 @@ private fun TaskendaBottomBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 destinations.forEachIndexed { index, destination ->
-                    TaskendaNavItem(
-                        modifier = Modifier.weight(1f),
-                        selected = safeSelectedTab == index,
-                        inactiveIcon = destination.second,
-                        activeIcon = destination.third,
-                        label = destination.first,
-                        onClick = {
-                            if (safeSelectedTab != index) {
-                                haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
-                                haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                                onTabSelected(index)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(vertical = 4.dp, horizontal = 2.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .clickable {
+                                if (safeSelectedTab != index) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                                    onTabSelected(index)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Igual que Diario: el contenido de cada espacio anima
+                        // icono/etiqueta mientras la cápsula se desplaza por detrás.
+                        AnimatedContent(
+                            targetState = safeSelectedTab == index,
+                            transitionSpec = {
+                                (fadeIn(animationSpec = tween(140)) +
+                                    androidx.compose.animation.scaleIn(
+                                        initialScale = 0.90f,
+                                        animationSpec = tween(160)
+                                    )) togetherWith
+                                    (fadeOut(animationSpec = tween(90)) +
+                                        androidx.compose.animation.scaleOut(
+                                            targetScale = 0.90f,
+                                            animationSpec = tween(110)
+                                        ))
+                            },
+                            label = "taskenda_bottom_nav_item"
+                        ) { isSelected ->
+                            if (isSelected) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = destination.third,
+                                        contentDescription = destination.first,
+                                        modifier = Modifier.size(24.dp),
+                                        tint = colors.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = destination.first,
+                                        fontSize = 11.sp,
+                                        lineHeight = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        color = colors.onPrimaryContainer
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = destination.second,
+                                    contentDescription = destination.first,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = colors.onSurfaceVariant
+                                )
                             }
                         }
-                    )
+                    }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TaskendaNavItem(
-    modifier: Modifier = Modifier,
-    selected: Boolean,
-    inactiveIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    activeIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(vertical = 4.dp, horizontal = 2.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        // Copia el comportamiento de Diario: el icono y la etiqueta cambian
-        // dentro de cada espacio fijo mediante fade + scale, sincronizados
-        // con la cápsula que viaja por detrás.
-        AnimatedContent(
-            targetState = selected,
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(180)) +
-                    androidx.compose.animation.scaleIn(
-                        initialScale = 0.88f,
-                        animationSpec = tween(220)
-                    )) togetherWith
-                    (fadeOut(animationSpec = tween(120)) +
-                        androidx.compose.animation.scaleOut(
-                            targetScale = 0.88f,
-                            animationSpec = tween(160)
-                        ))
-            },
-            label = "taskenda_bottom_nav_item"
-        ) { isSelected ->
-            if (isSelected) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = activeIcon,
-                        contentDescription = label,
-                        modifier = Modifier.size(24.dp),
-                        tint = colors.onPrimaryContainer
-                    )
-                    Text(
-                        text = label,
-                        fontSize = 11.sp,
-                        lineHeight = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                        color = colors.onPrimaryContainer
-                    )
-                }
-            } else {
-                Icon(
-                    imageVector = inactiveIcon,
-                    contentDescription = label,
-                    modifier = Modifier.size(24.dp),
-                    tint = colors.onSurfaceVariant
-                )
             }
         }
     }
