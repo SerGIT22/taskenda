@@ -1,0 +1,17 @@
+TASKENDA — CORRECCIÓN DEL MENÚ INFERIOR
+
+Archivo modificado:
+- app/src/main/java/com/sergio/taskenda/MainActivity.kt
+
+Cambios:
+- Reduce la duración del desplazamiento de la cápsula de 260 ms a 180 ms.
+- Mantiene un único indicador deslizante.
+- Sincroniza el cambio de icono y etiqueta con una transición corta de fade + scale.
+- Conserva los cuatro destinos, el tema dinámico y la respuesta háptica.
+- Elimina imports que dejan de utilizarse.
+
+No se ha aplicado la papelera en esta entrega. La implementación de la papelera queda pendiente para retomarla después de validar esta corrección.
+
+Verificación:
+- Se ha revisado el diff y la estructura del archivo.
+- No se ha ejecutado una compilación Android completa; valida con GitHub Actions antes de instalar.
