@@ -15,13 +15,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Spring
@@ -46,7 +46,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -335,12 +334,17 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 .padding(paddingValues)
         ) {
 
-            Crossfade(
+            AnimatedContent(
                 targetState = selectedTab,
-                animationSpec = tween(
-                    durationMillis = 180,
-                    easing = FastOutSlowInEasing
-                ),
+                transitionSpec = {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(
+                        animationSpec = tween(220, easing = FastOutSlowInEasing)
+                    ) { direction * it / 14 } + fadeIn(tween(180))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = tween(150, easing = FastOutSlowInEasing)
+                        ) { -direction * it / 14 } + fadeOut(tween(130)))
+                },
                 label = "taskenda_header_transition"
             ) { tab ->
 
@@ -504,12 +508,17 @@ private fun TaskendaApp(vm: TaskViewModel) {
                     .weight(1f)
             ) {
 
-                Crossfade(
+                AnimatedContent(
                     targetState = selectedTab,
-                    animationSpec = tween(
-                        durationMillis = 240,
-                        easing = FastOutSlowInEasing
-                    ),
+                    transitionSpec = {
+                        val direction = if (targetState > initialState) 1 else -1
+                        (slideInHorizontally(
+                            animationSpec = tween(270, easing = FastOutSlowInEasing)
+                        ) { direction * it / 10 } + fadeIn(tween(210))) togetherWith
+                            (slideOutHorizontally(
+                                animationSpec = tween(190, easing = FastOutSlowInEasing)
+                            ) { -direction * it / 10 } + fadeOut(tween(160)))
+                    },
                     label = "taskenda_category_transition"
                 ) { tab ->
 
@@ -1856,13 +1865,13 @@ private fun TaskendaBottomBar(
             val slotWidth = maxWidth / destinations.size
             val capsuleWidth = slotWidth - 4.dp
 
-            // Un único indicador compartido por los cuatro destinos.
-            // 180 ms reduce la sensación de retraso al cambiar de pestaña.
-            val indicatorX by animateDpAsState(
-                targetValue = slotWidth * safeSelectedTab + 2.dp,
-                animationSpec = tween(
-                    durationMillis = 180,
-                    easing = FastOutSlowInEasing
+            // Un único indicador compartido. Se anima en píxeles dentro de
+            // graphicsLayer para evitar relayouts en cada fotograma.
+            val indicatorProgress by animateFloatAsState(
+                targetValue = safeSelectedTab.toFloat(),
+                animationSpec = spring(
+                    dampingRatio = 0.88f,
+                    stiffness = 650f
                 ),
                 label = "taskenda_bottom_nav_indicator"
             )
@@ -1870,7 +1879,9 @@ private fun TaskendaBottomBar(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = indicatorX)
+                    .graphicsLayer {
+                        translationX = slotWidth.toPx() * indicatorProgress + 2.dp.toPx()
+                    }
                     .width(capsuleWidth)
                     .height(52.dp)
                     .clip(RoundedCornerShape(24.dp))
@@ -1902,15 +1913,15 @@ private fun TaskendaBottomBar(
                         AnimatedContent(
                             targetState = safeSelectedTab == index,
                             transitionSpec = {
-                                (fadeIn(animationSpec = tween(140)) +
+                                (fadeIn(animationSpec = tween(170)) +
                                     androidx.compose.animation.scaleIn(
-                                        initialScale = 0.90f,
-                                        animationSpec = tween(160)
+                                        initialScale = 0.94f,
+                                        animationSpec = tween(210, easing = FastOutSlowInEasing)
                                     )) togetherWith
-                                    (fadeOut(animationSpec = tween(90)) +
+                                    (fadeOut(animationSpec = tween(110)) +
                                         androidx.compose.animation.scaleOut(
-                                            targetScale = 0.90f,
-                                            animationSpec = tween(110)
+                                            targetScale = 0.94f,
+                                            animationSpec = tween(130, easing = FastOutSlowInEasing)
                                         ))
                             },
                             label = "taskenda_bottom_nav_item"
