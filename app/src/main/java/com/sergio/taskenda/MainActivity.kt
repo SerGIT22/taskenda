@@ -17,6 +17,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -54,6 +56,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -237,6 +241,8 @@ private fun TaskendaApp(vm: TaskViewModel) {
     val subtasksByTask = remember(subtasks) {
         subtasks.groupBy { it.taskId }
     }
+    // Mantiene la posición de cada pestaña al cambiar de sección.
+    val tabListStates = remember { mutableMapOf<Int, LazyListState>() }
 
     var selectedList by remember { mutableStateOf(vm.currentList) }
     var listSheetVisible by remember { mutableStateOf(false) }
@@ -471,42 +477,24 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 }
             }
 
-            val contentAlpha = remember { Animatable(1f) }
-            val contentOffset = remember { Animatable(0f) }
-            var previousTab by remember { mutableIntStateOf(selectedTab) }
-
-            LaunchedEffect(selectedTab) {
-                if (selectedTab == previousTab) return@LaunchedEffect
-                val direction = if (selectedTab > previousTab) 1f else -1f
-                previousTab = selectedTab
-                contentAlpha.snapTo(0f)
-                contentOffset.snapTo(direction * 18f)
-                launch {
-                    contentAlpha.animateTo(
-                        1f,
-                        animationSpec = tween(190, easing = FastOutSlowInEasing)
-                    )
-                }
-                contentOffset.animateTo(
-                    0f,
-                    animationSpec = tween(230, easing = FastOutSlowInEasing)
-                )
-            }
-
-            Box(
+            AnimatedContent(
+                targetState = selectedTab,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = contentAlpha.value
-                            translationX = contentOffset.value * density
-                        }
-                ) {
-                    val tab = selectedTab
+                    .weight(1f),
+                transitionSpec = {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        initialOffsetX = { width -> direction * width / 4 }
+                    ) + fadeIn(animationSpec = tween(220))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = tween(220, easing = FastOutSlowInEasing),
+                            targetOffsetX = { width -> -direction * width / 4 }
+                        ) + fadeOut(animationSpec = tween(160)))
+                },
+                label = "taskenda_section_transition"
+            ) { tab ->
 
                     val categoryTasks = tabTasksByCategory.getOrElse(tab) { emptyList() }
                     val tabTasks = if (tab == 0) {
@@ -575,7 +563,11 @@ private fun TaskendaApp(vm: TaskViewModel) {
                             }
                         )
                     } else {
+                        val listState = remember(tab) {
+                            tabListStates.getOrPut(tab) { LazyListState() }
+                        }
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
                                 start = 16.dp,
@@ -589,7 +581,8 @@ private fun TaskendaApp(vm: TaskViewModel) {
                                 items = displayedTasks,
                                 key = { it.id }
                             ) { task ->
-                                TaskRow(
+                                Box(modifier = Modifier.animateItem()) {
+                                    TaskRow(
                                     task = task,
                                     subtasks = subtasksByTask[task.id].orEmpty(),
                                     onToggleComplete = {
@@ -605,14 +598,14 @@ private fun TaskendaApp(vm: TaskViewModel) {
                                     onDelete = {
                                         vm.delete(task)
                                     }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
     if (listSheetVisible) {
         TaskListManagerSheet(
@@ -947,24 +940,49 @@ private fun TaskRow(
                 }
             }
 
+            val importantTint by animateColorAsState(
+                targetValue = if (task.important) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                label = "task_important_tint"
+            )
             IconButton(onClick = onToggleImportant) {
-                Icon(
-                    imageVector = if (task.important) {
-                        Icons.Default.Star
-                    } else {
-                        Icons.Outlined.StarBorder
+                AnimatedContent(
+                    targetState = task.important,
+                    transitionSpec = {
+                        (fadeIn(tween(130)) +
+                            androidx.compose.animation.scaleIn(
+                                initialScale = 0.75f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )) togetherWith
+                            (fadeOut(tween(90)) +
+                                androidx.compose.animation.scaleOut(
+                                    targetScale = 0.75f,
+                                    animationSpec = tween(110)
+                                ))
                     },
-                    contentDescription = if (task.important) {
-                        "Quitar de importantes"
-                    } else {
-                        "Marcar como importante"
-                    },
-                    tint = if (task.important) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
+                    label = "task_important_icon"
+                ) { important ->
+                    Icon(
+                        imageVector = if (important) {
+                            Icons.Default.Star
+                        } else {
+                            Icons.Outlined.StarBorder
+                        },
+                        contentDescription = if (important) {
+                            "Quitar de importantes"
+                        } else {
+                            "Marcar como importante"
+                        },
+                        tint = importantTint
+                    )
+                }
             }
 
             Box {
@@ -1041,6 +1059,21 @@ private fun TaskCheckbox(
             Box(contentAlignment = Alignment.Center) {
                 AnimatedContent(
                     targetState = checked,
+                    transitionSpec = {
+                        (fadeIn(tween(150)) +
+                            androidx.compose.animation.scaleIn(
+                                initialScale = 0.65f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )) togetherWith
+                            (fadeOut(tween(90)) +
+                                androidx.compose.animation.scaleOut(
+                                    targetScale = 0.7f,
+                                    animationSpec = tween(110)
+                                ))
+                    },
                     label = "task_checkbox"
                 ) { isChecked ->
                     if (isChecked) {
