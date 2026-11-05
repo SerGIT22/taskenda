@@ -941,24 +941,49 @@ private fun TaskRow(
                 }
             }
 
+            val importantTint by animateColorAsState(
+                targetValue = if (task.important) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                label = "task_important_tint"
+            )
             IconButton(onClick = onToggleImportant) {
-                Icon(
-                    imageVector = if (task.important) {
-                        Icons.Default.Star
-                    } else {
-                        Icons.Outlined.StarBorder
+                AnimatedContent(
+                    targetState = task.important,
+                    transitionSpec = {
+                        (fadeIn(tween(130)) +
+                            androidx.compose.animation.scaleIn(
+                                initialScale = 0.75f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )) togetherWith
+                            (fadeOut(tween(90)) +
+                                androidx.compose.animation.scaleOut(
+                                    targetScale = 0.75f,
+                                    animationSpec = tween(110)
+                                ))
                     },
-                    contentDescription = if (task.important) {
-                        "Quitar de importantes"
-                    } else {
-                        "Marcar como importante"
-                    },
-                    tint = if (task.important) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
+                    label = "task_important_icon"
+                ) { important ->
+                    Icon(
+                        imageVector = if (important) {
+                            Icons.Default.Star
+                        } else {
+                            Icons.Outlined.StarBorder
+                        },
+                        contentDescription = if (important) {
+                            "Quitar de importantes"
+                        } else {
+                            "Marcar como importante"
+                        },
+                        tint = importantTint
+                    )
+                }
             }
 
             Box {
@@ -1035,6 +1060,21 @@ private fun TaskCheckbox(
             Box(contentAlignment = Alignment.Center) {
                 AnimatedContent(
                     targetState = checked,
+                    transitionSpec = {
+                        (fadeIn(tween(150)) +
+                            androidx.compose.animation.scaleIn(
+                                initialScale = 0.65f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )) togetherWith
+                            (fadeOut(tween(90)) +
+                                androidx.compose.animation.scaleOut(
+                                    targetScale = 0.7f,
+                                    animationSpec = tween(110)
+                                ))
+                    },
                     label = "task_checkbox"
                 ) { isChecked ->
                     if (isChecked) {
