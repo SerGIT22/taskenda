@@ -606,7 +606,6 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 }
             }
         }
-    }
 
     if (listSheetVisible) {
         TaskListManagerSheet(
