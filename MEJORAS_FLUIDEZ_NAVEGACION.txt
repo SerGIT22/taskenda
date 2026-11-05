@@ -1,13 +1,33 @@
-TASKENDA — MEJORAS DE FLUIDEZ Y NAVEGACIÓN
+TASKENDA — CORRECCIÓN DE FLUIDEZ Y TRANSICIONES
 
-Cambios en esta versión:
-- Barra inferior con transiciones de color suaves para fondo, borde e iconos.
-- Etiqueta de la sección seleccionada entra y sale con expansión vertical y fade.
-- Conserva los cuatro destinos, el diseño flotante redondeado, los colores dinámicos y el feedback háptico.
-- Evita ejecutar el filtrado de las cuatro categorías repetidamente durante cada transición; las listas filtradas se memorizan hasta que cambian las tareas o la lista activa.
-- Reduce las transiciones de cabecera y contenido a 180 ms para dar una respuesta más ágil.
-- Conserva los recordatorios, las tareas recurrentes, las subtareas y la migración de base de datos presentes en la versión de referencia.
-- No se modifica .github/workflows/build.yml.
+Archivos modificados:
+- app/src/main/java/com/sergio/taskenda/MainActivity.kt
+- MEJORAS_FLUIDEZ_NAVEGACION.txt
 
-IMPORTANTE
-No se ha podido ejecutar una compilación Android real en este entorno. Ejecuta GitHub Actions y confirma que el APK se construye antes de instalarlo. No desinstales la app ni borres sus datos.
+Cambios en MainActivity.kt:
+1. Navegación inferior:
+   - El indicador único ahora se desplaza con una animación tween de 300 ms, siguiendo el patrón de Diario.
+   - Se elimina el muelle (spring) de alta rigidez que podía dar sensación de rebote o tirón.
+   - Los cuatro elementos mantienen una transición breve de fundido y escala al seleccionar/deseleccionar, como en Diario.
+   - Se conserva el feedback háptico, los cuatro destinos y los colores actuales.
+
+2. Cambio de sección:
+   - Se elimina la animación independiente de la cabecera para no ejecutar varias transiciones de pantalla a la vez.
+   - Se sustituye AnimatedContent alrededor de la lista por una transición de una sola composición mediante Animatable.
+   - La lista anterior deja de mantenerse renderizada mientras entra la nueva; así se evita tener dos LazyColumn completas activas durante el cambio.
+   - La sección entrante combina un fundido de 190 ms y un desplazamiento corto de 230 ms.
+   - La primera apertura no reproduce una animación innecesaria.
+
+3. Rendimiento:
+   - Se mantienen las listas por categoría memorizadas y el filtrado existente.
+   - No se cambian Room, el modelo de datos, recordatorios, recurrencias, subtareas, filtros ni ordenación.
+
+Archivos nuevos: ninguno.
+Archivos eliminados: ninguno.
+Migraciones de base de datos: ninguna.
+Workflow de GitHub Actions: sin cambios.
+
+Verificación:
+- Se ha revisado la estructura del ZIP y los bloques Kotlin modificados.
+- No se ha podido ejecutar una compilación Android en este entorno porque no hay Gradle ni Android SDK instalados.
+- La compilación definitiva debe confirmarse con GitHub Actions antes de instalar el APK.

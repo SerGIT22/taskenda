@@ -13,19 +13,18 @@ import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -46,6 +45,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -108,6 +108,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -142,6 +143,7 @@ import com.sergio.taskenda.data.TaskRepository
 import com.sergio.taskenda.data.TaskListStore
 import com.sergio.taskenda.ui.TaskViewModel
 import com.sergio.taskenda.ui.TaskViewModelFactory
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -334,46 +336,13 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 .padding(paddingValues)
         ) {
 
-            AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                    val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(
-                        animationSpec = tween(220, easing = FastOutSlowInEasing)
-                    ) { direction * it / 14 } + fadeIn(tween(180))) togetherWith
-                        (slideOutHorizontally(
-                            animationSpec = tween(150, easing = FastOutSlowInEasing)
-                        ) { -direction * it / 14 } + fadeOut(tween(130)))
-                },
-                label = "taskenda_header_transition"
-            ) { tab ->
-
-                TaskendaHeader(
-                    title = when (tab) {
-                        0 -> "Hoy"
-                        1 -> "Tareas"
-                        2 -> "Importantes"
-                        3 -> "Completadas"
-                        else -> "Tareas"
-                    },
-                    subtitle = when (tab) {
-                        0 -> "Tus tareas pendientes"
-                        1 -> "Todas las tareas pendientes"
-                        2 -> "Tareas marcadas como importantes"
-                        3 -> "Tareas que ya has terminado"
-                        else -> ""
-                    },
-                    taskCount = when (tab) {
-                        0 -> listTasks.count { !it.completed && isTodayOrOverdue(it.dueDate) }
-                        1 -> listTasks.count { !it.completed }
-                        2 -> listTasks.count { !it.completed && it.important }
-                        3 -> listTasks.count { it.completed }
-                        else -> 0
-                    },
-                    listName = selectedList,
-                    onListClick = { listSheetVisible = true }
-                )
-            }
+            TaskendaHeader(
+                title = headerTitle,
+                subtitle = headerSubtitle,
+                taskCount = headerCount,
+                listName = selectedList,
+                onListClick = { listSheetVisible = true }
+            )
 
             Row(
                 modifier = Modifier
@@ -502,25 +471,42 @@ private fun TaskendaApp(vm: TaskViewModel) {
                 }
             }
 
+            val contentAlpha = remember { Animatable(1f) }
+            val contentOffset = remember { Animatable(0f) }
+            var previousTab by remember { mutableIntStateOf(selectedTab) }
+
+            LaunchedEffect(selectedTab) {
+                if (selectedTab == previousTab) return@LaunchedEffect
+                val direction = if (selectedTab > previousTab) 1f else -1f
+                previousTab = selectedTab
+                contentAlpha.snapTo(0f)
+                contentOffset.snapTo(direction * 18f)
+                launch {
+                    contentAlpha.animateTo(
+                        1f,
+                        animationSpec = tween(190, easing = FastOutSlowInEasing)
+                    )
+                }
+                contentOffset.animateTo(
+                    0f,
+                    animationSpec = tween(230, easing = FastOutSlowInEasing)
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-
-                AnimatedContent(
-                    targetState = selectedTab,
-                    transitionSpec = {
-                        val direction = if (targetState > initialState) 1 else -1
-                        (slideInHorizontally(
-                            animationSpec = tween(270, easing = FastOutSlowInEasing)
-                        ) { direction * it / 10 } + fadeIn(tween(210))) togetherWith
-                            (slideOutHorizontally(
-                                animationSpec = tween(190, easing = FastOutSlowInEasing)
-                            ) { -direction * it / 10 } + fadeOut(tween(160)))
-                    },
-                    label = "taskenda_category_transition"
-                ) { tab ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = contentAlpha.value
+                            translationX = contentOffset.value * density
+                        }
+                ) {
+                    val tab = selectedTab
 
                     val categoryTasks = tabTasksByCategory.getOrElse(tab) { emptyList() }
                     val tabTasks = if (tab == 0) {
@@ -1865,23 +1851,18 @@ private fun TaskendaBottomBar(
             val slotWidth = maxWidth / destinations.size
             val capsuleWidth = slotWidth - 4.dp
 
-            // Un único indicador compartido. Se anima en píxeles dentro de
-            // graphicsLayer para evitar relayouts en cada fotograma.
-            val indicatorProgress by animateFloatAsState(
-                targetValue = safeSelectedTab.toFloat(),
-                animationSpec = spring(
-                    dampingRatio = 0.88f,
-                    stiffness = 650f
-                ),
+            // Una sola animación de desplazamiento, igual que en Diario.
+            // Los elementos mantienen una transición breve, coordinada con la cápsula.
+            val indicatorX by animateDpAsState(
+                targetValue = slotWidth * safeSelectedTab,
+                animationSpec = tween(300, easing = FastOutSlowInEasing),
                 label = "taskenda_bottom_nav_indicator"
             )
 
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .graphicsLayer {
-                        translationX = slotWidth.toPx() * indicatorProgress + 2.dp.toPx()
-                    }
+                    .offset(x = indicatorX + 2.dp)
                     .width(capsuleWidth)
                     .height(52.dp)
                     .clip(RoundedCornerShape(24.dp))
@@ -1893,6 +1874,7 @@ private fun TaskendaBottomBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 destinations.forEachIndexed { index, destination ->
+                    val isSelected = safeSelectedTab == index
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -1900,7 +1882,7 @@ private fun TaskendaBottomBar(
                             .padding(vertical = 4.dp, horizontal = 2.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .clickable {
-                                if (safeSelectedTab != index) {
+                                if (!isSelected) {
                                     haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                     haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
                                     onTabSelected(index)
@@ -1908,25 +1890,23 @@ private fun TaskendaBottomBar(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Igual que Diario: el contenido de cada espacio anima
-                        // icono/etiqueta mientras la cápsula se desplaza por detrás.
                         AnimatedContent(
-                            targetState = safeSelectedTab == index,
+                            targetState = isSelected,
                             transitionSpec = {
-                                (fadeIn(animationSpec = tween(170)) +
+                                (fadeIn(tween(180)) +
                                     androidx.compose.animation.scaleIn(
-                                        initialScale = 0.94f,
-                                        animationSpec = tween(210, easing = FastOutSlowInEasing)
+                                        initialScale = 0.88f,
+                                        animationSpec = tween(220)
                                     )) togetherWith
-                                    (fadeOut(animationSpec = tween(110)) +
+                                    (fadeOut(tween(120)) +
                                         androidx.compose.animation.scaleOut(
-                                            targetScale = 0.94f,
-                                            animationSpec = tween(130, easing = FastOutSlowInEasing)
+                                            targetScale = 0.88f,
+                                            animationSpec = tween(160)
                                         ))
                             },
                             label = "taskenda_bottom_nav_item"
-                        ) { isSelected ->
-                            if (isSelected) {
+                        ) { selected ->
+                            if (selected) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
