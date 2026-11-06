@@ -119,6 +119,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1104,6 +1105,23 @@ private fun TaskEditorSheet(
 ) {
 
     val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    // No retirar el sheet de composición hasta que termine su animación de salida.
+    val closeSheet: () -> Unit = {
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
+
+    val saveAndClose: (Task, List<Subtask>) -> Unit = { savedTask, savedSubtasks ->
+        scope.launch {
+            sheetState.hide()
+            onSave(savedTask, savedSubtasks)
+        }
+    }
 
     var title by remember(task?.id) {
         mutableStateOf(task?.title.orEmpty())
@@ -1152,8 +1170,8 @@ private fun TaskEditorSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = closeSheet,
+        sheetState = sheetState,
         dragHandle = null,
         containerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxHeight(0.96f)
@@ -1575,7 +1593,7 @@ private fun TaskEditorSheet(
                     val cleanTitle = title.trim()
                     if (cleanTitle.isBlank()) return@Button
 
-                    onSave(
+                    saveAndClose(
                         task?.copy(
                             title = cleanTitle,
                             notes = notes.trim(),
